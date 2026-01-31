@@ -42,7 +42,7 @@
 
 ## 📖 简介
 
-**TuneFree Mobile** 是一款基于 Web 技术构建的移动端优先音乐播放器。它不仅拥有媲美原生 iOS 应用的丝滑交互和毛玻璃 UI 设计，还集成了多平台音乐搜索、实时歌词、频谱可视化以及完善的本地歌单管理功能。
+**TuneFree Mobile** 是一款基于 Web 技术构建的移动端优先音乐播放器。它不仅拥有媲美原生 iOS 应用的丝滑交互和毛玻璃 UI 设计，还集成了 QQ 音乐资源搜索、实时歌词、频谱可视化以及完善的本地歌单管理功能。
 
 得益于 PWA (Progressive Web App) 技术，你可以将其直接安装到手机桌面，享受近乎原生的 App 体验。
 
@@ -55,23 +55,20 @@
 - **PWA 支持**: 支持添加到主屏幕，拥有独立的启动画面，去除浏览器地址栏，体验媲美原生 App。
 
 ### 🎵 核心音乐功能
-- **多源聚合搜索**: 支持网易云音乐、QQ音乐、酷我音乐等多个平台的资源搜索。
-- **无损音质**: 支持标准(128k)、高品(320k)、无损(FLAC)及 Hi-Res 音质播放与下载。
+- **QQ 音乐资源**: 基于 qq-music-api 提供海量 QQ 音乐资源搜索。
+- **无损音质**: 支持标准(128k)、高品(320k)、无损(FLAC) 音质播放与下载，自动降级处理。
 - **全功能播放器**:
   - 🔄 播放模式切换（顺序/单曲/随机）
   - 📊 实时音频频谱可视化 (Canvas绘制)
-  - 🎤 逐字/逐行滚动的实时歌词
+  - 🎤 逐行滚动的实时歌词
   - 💿 经典的黑胶唱片旋转动画
 
 ### 📂 数据管理
 - **本地歌单**: 即使不登录也可以创建、重命名、编辑歌单，数据存储在本地。
-- **在线导入**: 支持一键导入主流音乐平台的歌单。
+- **在线导入**: 支持一键导入 QQ 音乐歌单。
 - **数据备份**: 支持将歌单和收藏数据导出为 JSON 文件，并在不同设备间迁移。
 
-### 📈 系统监控
-- **状态仪表盘**: 内置可视化监控面板，实时查看 API 健康度、延迟、QPS 及平台可用性趋势。
-
-## 📸 截图展示
+##  截图展示
 
 | 首页 (Home) | 播放器 (Player) | 搜索 (Search) |
 |:---:|:---:|:---:|
@@ -88,6 +85,7 @@
 - **路由**: [React Router v6](https://reactrouter.com/) - 声明式路由管理。
 - **图标**: [Lucide React](https://lucide.dev/) - 优雅、统一的图标库。
 - **部署**: [Cloudflare Pages](https://pages.cloudflare.com/) - 自动化边缘网络部署。
+- **后端 API**: [qq-music-api](https://github.com/tooplick/qq-music-api) - 基于 Cloudflare Workers 的 QQ 音乐 API。
 
 ## 🚀 本地运行
 
@@ -95,8 +93,8 @@
 
 1. **克隆项目**
    ```bash
-   git clone https://github.com/alanbulan/musicxilan.git
-   cd musicxilan
+   git clone https://github.com/alanbulan/TuneFree_Mobile.git
+   cd TuneFree_Mobile
    ```
 
 2. **安装依赖**
@@ -142,20 +140,18 @@ npm run deploy
 
 ## 🌟 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=alanbulan/musicxilan&type=Date)](https://star-history.com/#alanbulan/musicxilan&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=alanbulan/TuneFree_Mobile&type=Date)](https://star-history.com/#alanbulan/TuneFree_Mobile&Date)
 
 ## 🌟 致谢
 
-特别感谢后端 API 的提供者，本项目核心数据服务依赖于其无私分享：
-- **API 作者**: [是青旨啊@sayqz](https://linux.do/u/sayqz) (Linux.do)
-- **原帖地址**: [Linux.do 话题链接](https://linux.do/t/topic/1326425)
+特别感谢后端 API 的提供者：
+- **qq-music-api**: [tooplick/qq-music-api](https://github.com/tooplick/qq-music-api) - 基于 Cloudflare Workers + D1 的 QQ 音乐 API 服务
 
 ## ⚠️ 声明
 
 本项目仅供学习 React 及现代前端技术栈使用。
 - 音乐资源来源于第三方 API，本项目不存储任何音频文件。
 - 请支持正版音乐，下载功能仅用于个人技术研究，请勿用于商业用途。
-- API 接口归属权解释权归原作者所有。
 
 ## 📄 License
 
