@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { ExternalLinkIcon, HeartFillIcon, HomeIcon, LibraryIcon, SearchIcon, SettingsIcon, SidebarCollapseIcon, SidebarExpandIcon } from '../../core/components/Icons';
+import { ExternalLinkIcon, HeartIcon, HomeIcon, LibraryIcon, SearchIcon, SettingsIcon, SidebarCollapseIcon, SidebarExpandIcon } from '../../core/components/Icons';
 import DesktopHome from '../features/home/DesktopHome';
 import DesktopLibrary from '../features/library/DesktopLibrary';
 import DesktopSearch from '../features/search/DesktopSearch';
@@ -15,7 +15,7 @@ interface DesktopShellProps {
 const navItems: { view: DesktopView; label: string; icon: React.ReactNode }[] = [
   { view: 'home', label: '首页', icon: <HomeIcon size={17} /> },
   { view: 'search', label: '搜索', icon: <SearchIcon size={17} /> },
-  { view: 'favorites', label: '收藏', icon: <HeartFillIcon size={17} /> },
+  { view: 'favorites', label: '收藏', icon: <HeartIcon size={17} /> },
   { view: 'playlists', label: '歌单', icon: <LibraryIcon size={17} /> },
   { view: 'settings', label: '管理', icon: <SettingsIcon size={17} /> },
   { view: 'about', label: '关于', icon: <ExternalLinkIcon size={17} /> },

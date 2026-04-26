@@ -12,6 +12,7 @@ import {
   parseGDStudioSongFull,
 } from "./gdStudio";
 import type { Song } from "../types";
+import { hasTranslatedLyrics, parseLyrics } from "../utils/lyrics";
 
 // ==============================
 // 解析缓存
@@ -110,7 +111,9 @@ const shouldPreferFallbackLyrics = (
   platform: string,
   parsedLyrics: string,
 ): boolean =>
-  platform === "qq" && !!parsedLyrics && !hasMergedTranslationLines(parsedLyrics);
+  (platform === "qq" || platform === "netease") &&
+  !!parsedLyrics &&
+  !hasMergedTranslationLines(parsedLyrics);
 
 const resolveLyricsFromParse = async (
   item: any,

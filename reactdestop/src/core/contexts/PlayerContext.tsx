@@ -14,7 +14,7 @@ import {
   getSongKey,
   isSameSong,
 } from "../types";
-import { parseSongFull } from "../services/api";
+import { getLyrics, parseSongFull } from "../services/api";
 import {
   loadStoredAudioQuality,
   loadStoredCurrentSong,
@@ -26,6 +26,7 @@ import {
   persistQueue,
 } from "./playerPersistence";
 import { getNextQueueIndex, getPrevQueueIndex } from "./playerQueue";
+import { hasTranslatedLyrics, parseLyrics, supportsTranslatedLyricFallback } from "../utils/lyrics";
 
 interface PlayerContextType {
   currentSong: Song | null;
@@ -489,6 +490,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
                 isSameSong(s, song) ? { ...s, ...patch } : s,
               ),
             );
+          }
+
+          if (
+            supportsTranslatedLyricFallback(song.source) &&
+            parsed.lrc &&
+            !hasTranslatedLyrics(parseLyrics(parsed.lrc))
+          ) {
+            void getLyrics(song.id, song.source).then((lrc) => {
+              if (!lrc || lrc === parsed.lrc || !hasTranslatedLyrics(parseLyrics(lrc))) return;
+              setCurrentSong((prev) => {
+                if (!isSameSong(prev, song) || !prev) return prev;
+                return { ...prev, lrc };
+              });
+              setQueue((prev) =>
+                prev.map((s) => (isSameSong(s, song) ? { ...s, lrc } : s)),
+              );
+            });
           }
         }
 

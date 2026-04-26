@@ -30,6 +30,7 @@ import {
 } from '../../core/contexts/PlayerContext';
 import { getLyrics, getSongUrl, triggerDownload } from '../../core/services/api';
 import type { AudioQuality } from '../../core/types';
+import { findActiveLyricIndex, hasTranslatedLyrics, parseLyrics, supportsTranslatedLyricFallback, type ParsedLyric } from '../../core/utils/lyrics';
 import { getSongKey, isSameSong } from '../../core/types';
 import CoverArt from './CoverArt';
 import VirtualList from './VirtualList';
@@ -40,11 +41,7 @@ interface DesktopFullPlayerProps {
   onSearch: (query: string) => void;
 }
 
-type LyricRow = {
-  time: number;
-  text: string;
-  translation?: string;
-};
+type LyricRow = ParsedLyric;
 
 type CoverPanelStyle = CSSProperties & {
   '--full-cover-bg'?: string;
@@ -60,8 +57,6 @@ type NoteStyle = CSSProperties & {
   '--note-drift'?: string;
 };
 
-const timeTagPattern = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
-const metadataPattern = /^\s*\[(ar|al|ti|by|offset|length|re|ve):.*\]\s*$/i;
 const noteGlyphs = ['♪', '♫', '♩', '♬', '♭', '♯'];
 
 const formatTime = (seconds: number) => {
@@ -69,79 +64,6 @@ const formatTime = (seconds: number) => {
   const min = Math.floor(seconds / 60);
   const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
   return `${min}:${sec}`;
-};
-
-const parseTimeMatch = (match: RegExpMatchArray): number => {
-  const minutes = Number(match[1]);
-  const seconds = Number(match[2]);
-  const fraction = Number((match[3] || '0').padEnd(3, '0').slice(0, 3));
-  return minutes * 60 + seconds + fraction / 1000;
-};
-
-const normalizeLyricText = (line: string): string =>
-  line.replace(timeTagPattern, '').replace(/\s+/g, ' ').trim();
-
-const parseLyrics = (lrc?: string): LyricRow[] => {
-  if (!lrc?.trim()) return [];
-
-  const grouped = new Map<number, string[]>();
-  const plainLines: string[] = [];
-
-  for (const rawLine of lrc.split('\n')) {
-    const line = rawLine.trim();
-    if (!line || metadataPattern.test(line)) continue;
-
-    const matches = Array.from(line.matchAll(timeTagPattern));
-    const text = normalizeLyricText(line);
-    if (!text) continue;
-
-    if (matches.length === 0) {
-      plainLines.push(text);
-      continue;
-    }
-
-    for (const match of matches) {
-      const key = Math.round(parseTimeMatch(match) * 1000);
-      const values = grouped.get(key) || [];
-      if (!values.includes(text)) values.push(text);
-      grouped.set(key, values);
-    }
-  }
-
-  const timedRows = Array.from(grouped.entries())
-    .sort(([a], [b]) => a - b)
-    .map(([time, values]) => ({
-      time: time / 1000,
-      text: values[0],
-      translation: values.slice(1).find((value) => value !== values[0]),
-    }));
-
-  if (timedRows.length > 0) return timedRows;
-
-  return plainLines.slice(0, 80).map((text, index) => ({
-    time: index * 4,
-    text,
-  }));
-};
-
-const getActiveLyricIndex = (rows: LyricRow[], currentTime: number): number => {
-  if (rows.length === 0) return -1;
-
-  let low = 0;
-  let high = rows.length - 1;
-  let activeIndex = 0;
-
-  while (low <= high) {
-    const mid = (low + high) >>> 1;
-    if (rows[mid].time <= currentTime) {
-      activeIndex = mid;
-      low = mid + 1;
-    } else {
-      high = mid - 1;
-    }
-  }
-
-  return activeIndex;
 };
 
 const buildScoreNotes = (text: string, currentTime: number) => {
@@ -204,9 +126,9 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
     setAudioQuality,
   } = usePlayerActions();
   const modeIcon = playMode === 'shuffle' ? <ShuffleIcon size={17} /> : playMode === 'loop' ? <RepeatOneIcon size={17} /> : <RepeatIcon size={17} />;
-  const rawLyrics = currentSong?.lrc || lyricsOverride;
+  const rawLyrics = lyricsOverride || currentSong?.lrc;
   const lyricRows = useMemo(() => parseLyrics(rawLyrics), [rawLyrics]);
-  const activeLyricIndex = getActiveLyricIndex(lyricRows, currentTime);
+  const activeLyricIndex = findActiveLyricIndex(lyricRows, currentTime);
   const activeLyric = activeLyricIndex >= 0 ? lyricRows[activeLyricIndex] : null;
   const lyricWindow = lyricRows.map((row, index) => ({ row, index }));
   const scoreText = activeLyric?.text || currentSong?.name || 'TuneFree Desktop';
@@ -220,7 +142,14 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
   const canCreatePlaylist = newPlaylistName.trim().length > 0;
 
   useEffect(() => {
-    if (!isOpen || !currentSong || currentSong.lrc) {
+    if (!isOpen || !currentSong) {
+      setLyricsOverride('');
+      setLyricsLoading(false);
+      return;
+    }
+
+    const currentRows = parseLyrics(currentSong.lrc);
+    if (currentSong.lrc && (!supportsTranslatedLyricFallback(currentSong.source) || hasTranslatedLyrics(currentRows))) {
       setLyricsOverride('');
       setLyricsLoading(false);
       return;
