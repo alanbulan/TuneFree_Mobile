@@ -4,7 +4,6 @@ import {
   ExternalLinkIcon,
   FolderIcon,
   GithubIcon,
-  HeartFillIcon,
   InfoIcon,
   KeyIcon,
   MusicIcon,
@@ -168,10 +167,6 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
 
       {activeView === 'favorites' && (
         <section>
-          <div className="section-header">
-            <h2 className="section-title"><HeartFillIcon size={20} /> 我喜欢的音乐</h2>
-            <span className="source-badge">{favorites.length} 首</span>
-          </div>
           <SongTable songs={favorites} currentSong={currentSong} isPlaying={isPlaying} emptyText="暂无收藏歌曲" onPlay={playSong} />
         </section>
       )}

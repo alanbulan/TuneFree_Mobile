@@ -1059,13 +1059,6 @@ img { display: block; }
     linear-gradient(180deg, rgba(255,255,255,.70), transparent 42%, rgba(250,35,59,.10));
   z-index: 2;
 }
-.transport-wave-bg::after {
-  top: 50%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(250,35,59,.22), rgba(0,122,255,.14), transparent);
-  transform: translateY(-50%);
-  z-index: 1;
-}
 .transport-wave-bg canvas {
   position: absolute;
   left: 0;

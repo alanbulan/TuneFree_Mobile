@@ -7,7 +7,7 @@ interface AudioVisualizerProps {
 }
 
 // === 可视化配置 ===
-const BAR_COUNT = 48;
+const BAR_COUNT = 96;
 const SMOOTHING_ALPHA = 0.35;           // 平滑系数 (越低越灵敏)
 const RESPONSE_CURVE = 0.7;             // 非线性响应曲线指数
 const MIN_BAR_PERCENT = 0.04;           // 最小可见高度百分比
@@ -88,7 +88,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isPlaying }) => {
       ctx.clearRect(0, 0, width, height);
 
       const totalSpace = width / BAR_COUNT;
-      const barWidth = totalSpace * 0.55;
+      const barWidth = totalSpace * 0.34;
       let x = (totalSpace - barWidth) / 2;
 
       const state = stateRef.current;
