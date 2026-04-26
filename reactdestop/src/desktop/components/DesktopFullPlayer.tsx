@@ -172,26 +172,51 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
   }, [currentSong, isOpen]);
 
   useEffect(() => {
-    if (!isOpen || !lyricListRef.current || activeLyricIndex < 0 || lyricRows.length === 0) return;
+    if (!isOpen) {
+      lyricScrollKeyRef.current = '';
+      return;
+    }
+    if (!lyricListRef.current || activeLyricIndex < 0 || lyricRows.length === 0) return;
 
     const container = lyricListRef.current;
     const songKey = currentSong ? `${currentSong.source}:${currentSong.id}` : '';
-    const scrollKey = `${songKey}:${lyricRows.length}`;
+    const scrollKey = `${songKey}:${lyricRows.length}:${rawLyrics?.length || 0}`;
     const isInitialScroll = lyricScrollKeyRef.current !== scrollKey;
     lyricScrollKeyRef.current = scrollKey;
 
-    const frame = window.requestAnimationFrame(() => {
-      const activeEl = container.children[activeLyricIndex] as HTMLElement | undefined;
+    const scrollActiveLyric = (behavior: ScrollBehavior) => {
+      const activeEl = container.querySelector<HTMLElement>('[data-active="true"]');
       if (!activeEl) return;
 
+      const containerRect = container.getBoundingClientRect();
+      const activeRect = activeEl.getBoundingClientRect();
+      const top = container.scrollTop + activeRect.top - containerRect.top - container.clientHeight / 2 + activeRect.height / 2;
+
       container.scrollTo({
-        top: activeEl.offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2,
-        behavior: isInitialScroll || activeLyricIndex <= 1 ? 'auto' : 'smooth',
+        top,
+        behavior,
       });
+    };
+
+    let frame = 0;
+    let secondFrame = 0;
+    let timeout = 0;
+    const behavior: ScrollBehavior = isInitialScroll || activeLyricIndex <= 1 ? 'auto' : 'smooth';
+
+    frame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => scrollActiveLyric(behavior));
     });
 
-    return () => window.cancelAnimationFrame(frame);
-  }, [activeLyricIndex, lyricRows.length, isOpen, currentSong?.id, currentSong?.source]);
+    if (isInitialScroll) {
+      timeout = window.setTimeout(() => scrollActiveLyric('auto'), 380);
+    }
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.cancelAnimationFrame(secondFrame);
+      if (timeout) window.clearTimeout(timeout);
+    };
+  }, [activeLyricIndex, lyricRows, rawLyrics, isOpen, currentSong?.id, currentSong?.source]);
 
   const handleDownload = async (quality: AudioQuality) => {
     if (!currentSong || downloadQuality) return;
