@@ -1,15 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  BoxesIcon,
+  CloudIcon,
+  CodeIcon,
+  DatabaseIcon,
   DownloadIcon,
   ExternalLinkIcon,
+  FileCodeIcon,
   FolderIcon,
   GithubIcon,
   InfoIcon,
   KeyIcon,
   MusicIcon,
+  PanelsIcon,
   PlusIcon,
+  RocketIcon,
+  ServerIcon,
   SettingsIcon,
   UploadIcon,
+  WaveformIcon,
 } from '../../../core/components/Icons';
 import { useLibrary } from '../../../core/contexts/LibraryContext';
 import { usePlayerActions, usePlayerNowPlaying } from '../../../core/contexts/PlayerContext';
@@ -26,6 +35,17 @@ const viewMeta: Record<LibraryView, { eyebrow: string; title: string }> = {
   about: { eyebrow: 'About TuneFree', title: '关于' },
 };
 const importSourceOptions = ['netease', 'qq', 'kuwo'];
+const desktopTechStack = [
+  { name: 'Next.js 15', detail: 'App Router', icon: <RocketIcon size={18} /> },
+  { name: 'React 19', detail: 'Client UI', icon: <CodeIcon size={18} /> },
+  { name: 'TypeScript', detail: 'Typed Core', icon: <FileCodeIcon size={18} /> },
+  { name: 'Static Export', detail: 'Edge Pages', icon: <CloudIcon size={18} /> },
+  { name: 'Cloudflare Pages', detail: 'Deploy', icon: <ServerIcon size={18} /> },
+  { name: 'Pages Functions', detail: 'API Proxy', icon: <DatabaseIcon size={18} /> },
+  { name: 'Web Audio API', detail: 'Analyser', icon: <WaveformIcon size={18} /> },
+  { name: 'Canvas', detail: 'Spectrum', icon: <PanelsIcon size={18} /> },
+  { name: 'Virtual List', detail: 'Large Queue', icon: <BoxesIcon size={18} /> },
+];
 
 interface DesktopLibraryProps {
   activeView: LibraryView;
@@ -311,9 +331,15 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
           <div className="about-card glass-panel">
             <SettingsIcon size={30} />
             <h3>桌面端技术栈</h3>
-            <div className="about-chip-row">
-              {['Next.js 15', 'React 19', 'TypeScript', 'Static Export', 'Cloudflare Pages', 'Pages Functions', 'Web Audio API', 'Canvas', 'Virtual List'].map((tech) => (
-                <span key={tech}>{tech}</span>
+            <div className="about-tech-grid">
+              {desktopTechStack.map((tech) => (
+                <span className="about-tech-chip" key={tech.name}>
+                  <span className="about-tech-icon">{tech.icon}</span>
+                  <span>
+                    <strong>{tech.name}</strong>
+                    <em>{tech.detail}</em>
+                  </span>
+                </span>
               ))}
             </div>
             <p>桌面版位于独立的 reactdestop 目录，使用 Next.js 静态导出部署；API 代理通过同源 Cloudflare Pages Functions 提供，不影响原 iOS PWA。</p>

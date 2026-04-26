@@ -4,7 +4,8 @@ import {
   Play, Pause, SkipForward, SkipBack, Search, Home,
   ListMusic, MoreHorizontal, ChevronDown, Music2, AlertCircle,
   Heart, Plus, Share, Download, Upload, Trash2, Settings, Folder,
-  Repeat, Repeat1, Shuffle, List, PanelLeftClose, PanelLeftOpen, Key, Info, ExternalLink, Github, X
+  Repeat, Repeat1, Shuffle, List, PanelLeftClose, PanelLeftOpen, Key, Info, ExternalLink, Github, X,
+  Code2, Boxes, FileCode2, Rocket, Cloud, Server, AudioWaveform, PanelsTopLeft, Database
 } from 'lucide-react';
 
 export const PlayIcon = ({ size = 24, className = "" }) => <Play size={size} className={className} fill="currentColor" />;
@@ -42,3 +43,12 @@ export const InfoIcon = ({ size = 24, className = "" }) => <Info size={size} cla
 export const ExternalLinkIcon = ({ size = 24, className = "" }) => <ExternalLink size={size} className={className} />;
 export const GithubIcon = ({ size = 24, className = "" }) => <Github size={size} className={className} />;
 export const CloseIcon = ({ size = 24, className = "" }) => <X size={size} className={className} />;
+export const CodeIcon = ({ size = 24, className = "" }) => <Code2 size={size} className={className} />;
+export const BoxesIcon = ({ size = 24, className = "" }) => <Boxes size={size} className={className} />;
+export const FileCodeIcon = ({ size = 24, className = "" }) => <FileCode2 size={size} className={className} />;
+export const RocketIcon = ({ size = 24, className = "" }) => <Rocket size={size} className={className} />;
+export const CloudIcon = ({ size = 24, className = "" }) => <Cloud size={size} className={className} />;
+export const ServerIcon = ({ size = 24, className = "" }) => <Server size={size} className={className} />;
+export const WaveformIcon = ({ size = 24, className = "" }) => <AudioWaveform size={size} className={className} />;
+export const PanelsIcon = ({ size = 24, className = "" }) => <PanelsTopLeft size={size} className={className} />;
+export const DatabaseIcon = ({ size = 24, className = "" }) => <Database size={size} className={className} />;
