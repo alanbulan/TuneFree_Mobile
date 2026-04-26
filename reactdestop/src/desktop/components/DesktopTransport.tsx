@@ -19,6 +19,7 @@ import {
   usePlayerQueueState,
   usePlayerSettings,
 } from '../../core/contexts/PlayerContext';
+import AudioVisualizer from '../../core/components/AudioVisualizer';
 import { getSongUrl, triggerDownload } from '../../core/services/api';
 import type { AudioQuality } from '../../core/types';
 import CoverArt from './CoverArt';
@@ -132,9 +133,7 @@ export default function DesktopTransport({ onExpand }: DesktopTransportProps) {
   return (
     <div className="transport mini-player">
       <div className="transport-wave-bg mini-wave-bg" aria-hidden="true">
-        <span />
-        <span />
-        <span />
+        <AudioVisualizer isPlaying={isPlaying} />
       </div>
 
       <button type="button" className="transport-main mini-player-summary" onClick={onExpand} aria-label="打开全屏播放器">

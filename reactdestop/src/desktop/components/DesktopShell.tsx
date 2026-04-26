@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { ExternalLinkIcon, HeartFillIcon, HomeIcon, LibraryIcon, SearchIcon, SettingsIcon } from '../../core/components/Icons';
+import { ExternalLinkIcon, HeartFillIcon, HomeIcon, LibraryIcon, SearchIcon, SettingsIcon, SidebarCollapseIcon, SidebarExpandIcon } from '../../core/components/Icons';
 import DesktopHome from '../features/home/DesktopHome';
 import DesktopLibrary from '../features/library/DesktopLibrary';
 import DesktopSearch from '../features/search/DesktopSearch';
@@ -47,7 +47,7 @@ export default function DesktopShell({ view, onViewChange }: DesktopShellProps) 
       <header className="window-bar">
         <div className="window-brand-lockup" aria-label="TuneFree Desktop">
           <img className="brand-mark" src="/icon.svg" alt="" aria-hidden="true" />
-          <span>Music</span>
+          <span>TuneFree</span>
         </div>
         {view !== 'search' ? (
           <form className="command-search" onSubmit={handleCommandSearch}>
@@ -55,10 +55,7 @@ export default function DesktopShell({ view, onViewChange }: DesktopShellProps) 
             <input value={commandQuery} onChange={(event) => setCommandQuery(event.target.value)} placeholder="搜索" />
           </form>
         ) : <div />}
-        <div className="brand-mini" aria-label="TuneFree Desktop">
-          <img className="brand-mark" src="/icon.svg" alt="" aria-hidden="true" />
-          <span>TuneFree</span>
-        </div>
+        <div />
       </header>
 
       <aside className="sidebar">
@@ -67,13 +64,11 @@ export default function DesktopShell({ view, onViewChange }: DesktopShellProps) 
             type="button"
             className="sidebar-toggle"
             aria-label={sidebarCollapsed ? '展开侧边菜单' : '收起侧边菜单'}
+            title={sidebarCollapsed ? '展开侧边菜单' : '收起侧边菜单'}
             onClick={() => setSidebarCollapsed((prev) => !prev)}
           >
-            <span />
-            <span />
-            <span />
+            {sidebarCollapsed ? <SidebarExpandIcon size={20} /> : <SidebarCollapseIcon size={20} />}
           </button>
-          <span className="sidebar-title">TuneFree</span>
         </div>
         <p className="sidebar-section-title">TuneFree</p>
         <nav className="nav-group" aria-label="主导航">

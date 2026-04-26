@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import AudioVisualizer from '../../core/components/AudioVisualizer';
 import {
   CloseIcon,
   DownloadIcon,
@@ -497,9 +498,7 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
 
         <div className="full-player-controls">
           <div className="transport-wave-bg" aria-hidden="true">
-            <span />
-            <span />
-            <span />
+            <AudioVisualizer isPlaying={isPlaying} />
           </div>
           <div className="transport-main">
             <CoverArt
