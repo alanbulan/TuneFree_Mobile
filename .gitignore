@@ -13,6 +13,7 @@ node_modules
 .reference
 reactdestop/.next
 reactdestop/.reference
+reactdestop/out
 dist
 dist-ssr
 *.local
