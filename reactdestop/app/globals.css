@@ -222,6 +222,7 @@ img { display: block; }
 }
 .nav-button,
 .playlist-pill {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -232,7 +233,24 @@ img { display: block; }
   border-radius: 12px;
   text-align: left;
   font-size: 13px;
+  overflow: hidden;
 }
+.nav-button > *,
+.playlist-pill > * { position: relative; z-index: 1; }
+.nav-button::before,
+.playlist-pill::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(250,35,59,.12), rgba(250,35,59,.05));
+  opacity: 0;
+  transform: translateX(-18px) scaleX(.86);
+  transition: opacity .22s ease, transform .24s cubic-bezier(.2,.8,.2,1);
+}
+.nav-button:hover::before,
+.nav-button.active::before,
+.playlist-pill:hover::before { opacity: 1; transform: translateX(0) scaleX(1); }
 .nav-button:hover,
 .nav-button.active,
 .playlist-pill:hover,
@@ -284,11 +302,17 @@ img { display: block; }
   min-height: 48px;
   padding: 0;
   border-radius: 17px;
+  overflow: hidden;
   background: rgba(255,255,255,.42);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.58), 0 12px 24px rgba(0,0,0,.035);
   backdrop-filter: blur(18px) saturate(1.18);
   -webkit-backdrop-filter: blur(18px) saturate(1.18);
 }
+.sidebar-collapsed .nav-button::before,
+.sidebar-collapsed .playlist-pill::before { inset: 0; border-radius: inherit; transform: scale(.78); }
+.sidebar-collapsed .nav-button:hover::before,
+.sidebar-collapsed .nav-button.active::before,
+.sidebar-collapsed .playlist-pill:hover::before { transform: scale(1); }
 .sidebar-collapsed .nav-button svg,
 .sidebar-collapsed .playlist-pill svg { display: block; margin: 0; transform: translateX(0); }
 .sidebar-collapsed .nav-button:hover,
@@ -297,7 +321,19 @@ img { display: block; }
 .sidebar-collapsed .playlist-stack { max-height: 210px; padding-right: 0; }
 
 .workspace { grid-column: 2; grid-row: 2 / 3; position: relative; z-index: 1; min-width: 0; min-height: 0; overflow: hidden; background: var(--ios-bg); }
-.view-scroll { height: 100%; overflow: auto; padding: 34px 40px 42px; }
+.view-scroll {
+  height: 100%;
+  overflow: auto;
+  padding: 34px 40px 42px;
+  animation: viewScrollFade .28s cubic-bezier(.2,.8,.2,1) both;
+}
+.view-transition-panel {
+  min-height: 100%;
+  transform-origin: 50% 24px;
+  animation: viewEnter .34s cubic-bezier(.2,.8,.2,1) both;
+  will-change: transform, opacity, filter;
+}
+.view-transition-panel > * { animation: viewContentLift .42s cubic-bezier(.2,.8,.2,1) both; }
 .view-scroll::-webkit-scrollbar,
 .playlist-stack::-webkit-scrollbar,
 .queue-list::-webkit-scrollbar,
@@ -1070,6 +1106,15 @@ img { display: block; }
 .skeleton-library-card { pointer-events: none; }
 .skeleton-card-icon { width: 36px; height: 36px; border-radius: 12px; }
 @keyframes skeletonSweep { 0% { background-position: 160% 0; } 100% { background-position: -80% 0; } }
+@keyframes viewScrollFade { from { background: rgba(255,255,255,.34); } to { background: transparent; } }
+@keyframes viewEnter {
+  from { opacity: 0; transform: translate3d(18px, 10px, 0) scale(.988); filter: blur(8px); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
+}
+@keyframes viewContentLift {
+  from { opacity: .86; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 @keyframes coverSpin { to { transform: rotate(360deg); } }
 @keyframes coverBackdropFloat { 0% { transform: translate3d(-1.5%, -1%, 0) scale(1.08) rotate(-1deg); } 100% { transform: translate3d(1.5%, 1%, 0) scale(1.14) rotate(1deg); } }
 @keyframes waveDrift { 0%, 100% { transform: translate3d(-18px, 0, 0) rotate(-1deg) scaleX(1.02); } 50% { transform: translate3d(18px, -5px, 0) rotate(1deg) scaleX(1.08); } }

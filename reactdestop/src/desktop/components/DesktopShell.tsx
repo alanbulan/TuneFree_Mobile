@@ -88,10 +88,12 @@ export default function DesktopShell({ view, onViewChange }: DesktopShellProps) 
       </aside>
 
       <main className="workspace">
-        <div className="view-scroll">
-          {view === 'home' && <DesktopHome onViewChange={onViewChange} />}
-          {view === 'search' && <DesktopSearch commandQuery={searchRequest.query} commandNonce={searchRequest.nonce} />}
-          {libraryViews.includes(view as LibraryView) && <DesktopLibrary activeView={view as LibraryView} />}
+        <div className="view-scroll" key={view}>
+          <div className="view-transition-panel">
+            {view === 'home' && <DesktopHome onViewChange={onViewChange} />}
+            {view === 'search' && <DesktopSearch commandQuery={searchRequest.query} commandNonce={searchRequest.nonce} />}
+            {libraryViews.includes(view as LibraryView) && <DesktopLibrary activeView={view as LibraryView} />}
+          </div>
         </div>
       </main>
 
