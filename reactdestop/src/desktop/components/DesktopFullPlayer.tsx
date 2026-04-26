@@ -127,14 +127,20 @@ const parseLyrics = (lrc?: string): LyricRow[] => {
 const getActiveLyricIndex = (rows: LyricRow[], currentTime: number): number => {
   if (rows.length === 0) return -1;
 
+  let low = 0;
+  let high = rows.length - 1;
   let activeIndex = 0;
-  for (let index = 0; index < rows.length; index += 1) {
-    if (rows[index].time <= currentTime + 0.22) {
-      activeIndex = index;
+
+  while (low <= high) {
+    const mid = (low + high) >>> 1;
+    if (rows[mid].time <= currentTime) {
+      activeIndex = mid;
+      low = mid + 1;
     } else {
-      break;
+      high = mid - 1;
     }
   }
+
   return activeIndex;
 };
 
@@ -238,10 +244,9 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
   useEffect(() => {
     if (!lyricListRef.current || activeLyricIndex < 0) return;
 
-    const activeEl = lyricListRef.current.querySelector<HTMLElement>('[data-active="true"]');
-    if (!activeEl) return;
-
     const container = lyricListRef.current;
+    const activeEl = container.children[activeLyricIndex] as HTMLElement | undefined;
+    if (!activeEl) return;
     container.scrollTo({
       top: activeEl.offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2,
       behavior: 'smooth',
