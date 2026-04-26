@@ -49,13 +49,13 @@ export default function VirtualRail<T>({
   };
 
   return (
-    <div ref={ref} className={`virtual-rail ${className}`.trim()} style={{ height: itemHeight + 28 }} onScroll={handleScroll}>
+    <div ref={ref} className={`virtual-rail ${className}`.trim()} style={{ height: itemHeight + 38 }} onScroll={handleScroll}>
       <div className="virtual-rail-spacer" style={{ width: Math.max(0, items.length * stride - gap), height: itemHeight }}>
         {visibleItems.map(({ item, index }) => (
           <Fragment key={getKey(item, index)}>
             {renderItem(item, index, {
               position: 'absolute',
-              top: 0,
+              top: 8,
               left: index * stride,
               width: itemWidth,
               height: itemHeight,

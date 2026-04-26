@@ -1,17 +1,21 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   CloseIcon,
   DownloadIcon,
   HeartFillIcon,
   HeartIcon,
   MusicIcon,
+  MoreIcon,
   NextIcon,
   PauseIcon,
   PlayIcon,
   PrevIcon,
   QueueIcon,
   RepeatIcon,
+  PlusIcon,
   RepeatOneIcon,
+  SearchIcon,
+  ShareIcon,
   ShuffleIcon,
   TrashIcon,
 } from '../../core/components/Icons';
@@ -23,15 +27,16 @@ import {
   usePlayerQueueState,
   usePlayerSettings,
 } from '../../core/contexts/PlayerContext';
-import { getSongUrl, triggerDownload } from '../../core/services/api';
+import { getLyrics, getSongUrl, triggerDownload } from '../../core/services/api';
 import type { AudioQuality } from '../../core/types';
-import { isSameSong } from '../../core/types';
+import { getSongKey, isSameSong } from '../../core/types';
 import CoverArt from './CoverArt';
 import VirtualList from './VirtualList';
 
 interface DesktopFullPlayerProps {
   isOpen: boolean;
   onClose: () => void;
+  onSearch: (query: string) => void;
 }
 
 type LyricRow = {
@@ -162,13 +167,24 @@ const downloadMeta: Record<string, { label: string; ext: string }> = {
   flac24bit: { label: 'Hi-Res', ext: 'flac' },
 };
 
-export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayerProps) {
+const playModeLabel = {
+  sequence: '列表循环',
+  loop: '单曲循环',
+  shuffle: '随机播放',
+};
+
+export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: DesktopFullPlayerProps) {
   const { currentSong, isPlaying, isLoading } = usePlayerNowPlaying();
   const { currentTime, duration } = usePlayerProgress();
   const { queue, playMode } = usePlayerQueueState();
   const { audioQuality } = usePlayerSettings();
-  const { toggleFavorite, isFavorite } = useLibrary();
+  const { toggleFavorite, isFavorite, playlists, addToPlaylist, createPlaylist } = useLibrary();
   const [downloadQuality, setDownloadQuality] = useState<AudioQuality | null>(null);
+  const [lyricsOverride, setLyricsOverride] = useState('');
+  const [lyricsLoading, setLyricsLoading] = useState(false);
+  const [showMorePanel, setShowMorePanel] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const lyricListRef = useRef<HTMLDivElement>(null);
   const {
     playSong,
     clearQueue,
@@ -181,15 +197,11 @@ export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayer
     setAudioQuality,
   } = usePlayerActions();
   const modeIcon = playMode === 'shuffle' ? <ShuffleIcon size={17} /> : playMode === 'loop' ? <RepeatOneIcon size={17} /> : <RepeatIcon size={17} />;
-  const lyricRows = useMemo(() => parseLyrics(currentSong?.lrc), [currentSong?.lrc]);
+  const rawLyrics = currentSong?.lrc || lyricsOverride;
+  const lyricRows = useMemo(() => parseLyrics(rawLyrics), [rawLyrics]);
   const activeLyricIndex = getActiveLyricIndex(lyricRows, currentTime);
   const activeLyric = activeLyricIndex >= 0 ? lyricRows[activeLyricIndex] : null;
-  const lyricWindow = lyricRows.length > 0
-    ? lyricRows.slice(Math.max(0, activeLyricIndex - 2), Math.min(lyricRows.length, activeLyricIndex + 4)).map((row, offset) => ({
-      row,
-      index: Math.max(0, activeLyricIndex - 2) + offset,
-    }))
-    : [];
+  const lyricWindow = lyricRows.map((row, index) => ({ row, index }));
   const scoreText = activeLyric?.text || currentSong?.name || 'TuneFree Desktop';
   const scoreNotes = useMemo(() => buildScoreNotes(scoreText, currentTime), [currentTime, scoreText]);
   const panelStyle = currentSong?.pic
@@ -197,6 +209,44 @@ export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayer
     : undefined;
   const hasSong = !!currentSong;
   const favoriteActive = hasSong && isFavorite(currentSong.id, currentSong.source);
+  const currentSongKey = currentSong ? getSongKey(currentSong) : '';
+  const canCreatePlaylist = newPlaylistName.trim().length > 0;
+
+  useEffect(() => {
+    if (!isOpen || !currentSong || currentSong.lrc) {
+      setLyricsOverride('');
+      setLyricsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLyricsOverride('');
+    setLyricsLoading(true);
+
+    getLyrics(currentSong.id, currentSong.source).then((lrc) => {
+      if (!cancelled) setLyricsOverride(lrc || '');
+    }).finally(() => {
+      if (!cancelled) setLyricsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSong, isOpen]);
+
+  useEffect(() => {
+    if (!lyricListRef.current || activeLyricIndex < 0) return;
+
+    const activeEl = lyricListRef.current.querySelector<HTMLElement>('[data-active="true"]');
+    if (!activeEl) return;
+
+    const container = lyricListRef.current;
+    container.scrollTo({
+      top: activeEl.offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2,
+      behavior: 'smooth',
+    });
+  }, [activeLyricIndex]);
+
   const handleDownload = async (quality: AudioQuality) => {
     if (!currentSong || downloadQuality) return;
 
@@ -210,6 +260,27 @@ export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayer
     } finally {
       setDownloadQuality(null);
     }
+  };
+
+  const handleShare = async () => {
+    if (!currentSong) return;
+
+    const text = `我在 TuneFree 发现了一首好歌：${currentSong.artist} - ${currentSong.name}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: currentSong.name, text, url: window.location.origin });
+      } else {
+        await navigator.clipboard.writeText(`${text} ${window.location.origin}`);
+      }
+    } catch {
+      // share cancelled
+    }
+  };
+
+  const handleCreatePlaylist = () => {
+    if (!currentSong || !canCreatePlaylist) return;
+    createPlaylist(newPlaylistName.trim(), [currentSong]);
+    setNewPlaylistName('');
   };
 
   return (
@@ -244,6 +315,15 @@ export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayer
                 {favoriteActive ? <HeartFillIcon size={18} /> : <HeartIcon size={18} />}
                 {favoriteActive ? '已喜欢' : '喜欢'}
               </button>
+              <button
+                type="button"
+                className={`full-action-button ${showMorePanel ? 'active' : ''}`}
+                disabled={!currentSong}
+                onClick={() => setShowMorePanel((prev) => !prev)}
+              >
+                <MoreIcon size={18} />
+                更多
+              </button>
               <div className="download-action-group" aria-label="下载音质">
                 {qualityOptions.map((quality) => {
                   const meta = downloadMeta[quality];
@@ -262,6 +342,43 @@ export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayer
                 })}
               </div>
             </div>
+            {currentSong && showMorePanel ? (
+              <div className="full-more-panel" aria-label="更多播放操作">
+                <div className="full-more-row compact">
+                  <button type="button" className="full-more-button" onClick={handleShare}>
+                    <ShareIcon size={15} /> 分享
+                  </button>
+                  <button type="button" className="full-more-button" disabled={!currentSong.artist} onClick={() => onSearch(currentSong.artist)}>
+                    <SearchIcon size={15} /> 搜索歌手
+                  </button>
+                  <button type="button" className="full-more-button" disabled={!currentSong.album} onClick={() => onSearch(currentSong.album)}>
+                    <SearchIcon size={15} /> 搜索专辑
+                  </button>
+                </div>
+                <div className="full-more-playlist">
+                  <div className="full-more-title">添加到歌单</div>
+                  <div className="full-more-create">
+                    <input value={newPlaylistName} onChange={(event) => setNewPlaylistName(event.target.value)} placeholder="新建歌单" />
+                    <button type="button" disabled={!canCreatePlaylist} onClick={handleCreatePlaylist}>
+                      <PlusIcon size={14} /> 创建
+                    </button>
+                  </div>
+                  <div className="full-more-playlist-list">
+                    {playlists.length === 0 ? (
+                      <span className="full-more-empty">还没有歌单</span>
+                    ) : playlists.slice(0, 6).map((playlist) => {
+                      const added = playlist.songs.some((song) => getSongKey(song) === currentSongKey);
+                      return (
+                        <button type="button" key={playlist.id} className="full-more-playlist-button" onClick={() => addToPlaylist(playlist.id, currentSong)}>
+                          <span>{playlist.name}</span>
+                          <em>{added ? '已添加' : `${playlist.songs.length} 首`}</em>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -289,24 +406,31 @@ export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayer
           </div>
           <div className="full-lyrics-content">
             {lyricWindow.length > 0 ? (
-              <div className="lyric-scroll" aria-live="polite">
+              <div ref={lyricListRef} className="lyric-scroll lyric-scrollable" aria-live="polite">
                 {lyricWindow.map(({ row, index }) => {
                   const offset = index - activeLyricIndex;
                   const style = { '--lyric-offset': offset } as OffsetStyle;
                   return (
-                    <p className={`lyric-line ${offset === 0 ? 'active' : ''} ${Math.abs(offset) > 1 ? 'dim' : ''}`} style={style} key={`${row.time}-${row.text}`}>
+                    <button
+                      type="button"
+                      className={`lyric-line ${offset === 0 ? 'active' : ''} ${Math.abs(offset) > 2 ? 'dim' : ''}`}
+                      style={style}
+                      key={`${row.time}-${row.text}`}
+                      data-active={offset === 0 ? 'true' : undefined}
+                      onClick={() => seek(row.time)}
+                    >
                       <span>{row.text}</span>
                       {row.translation ? <em>{row.translation}</em> : null}
-                    </p>
+                    </button>
                   );
                 })}
               </div>
             ) : (
               <div className="lyric-scroll lyric-empty" aria-live="polite">
-                <MusicIcon size={30} />
+                {lyricsLoading ? <span className="lyric-loading-dot" /> : <MusicIcon size={30} />}
                 <p className="lyric-line active">
-                  <span>{currentSong?.name || 'TuneFree Desktop'}</span>
-                  <em>{currentSong?.artist || '选择一首音乐开始'}</em>
+                  <span>{lyricsLoading ? '加载歌词中...' : currentSong?.name || 'TuneFree Desktop'}</span>
+                  <em>{lyricsLoading ? currentSong?.name || '' : currentSong?.artist || '选择一首音乐开始'}</em>
                 </p>
               </div>
             )}
@@ -323,7 +447,10 @@ export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayer
             </div>
           </div>
           <div className="queue-header">
-            <h3 className="panel-title"><QueueIcon size={18} /> 播放队列</h3>
+            <div>
+              <h3 className="panel-title"><QueueIcon size={18} /> 播放队列</h3>
+              <button type="button" className="queue-mode-chip" onClick={togglePlayMode}>{playModeLabel[playMode]}</button>
+            </div>
             <button type="button" className="icon-button" aria-label="清空队列" onClick={clearQueue}>
               <TrashIcon size={16} />
             </button>

@@ -29,22 +29,25 @@ export default function DesktopShell({ view, onViewChange }: DesktopShellProps) 
   const [fullPlayerOpen, setFullPlayerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const handleCommandSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const clean = commandQuery.trim();
+  const submitSearch = (query: string) => {
+    const clean = query.trim();
     if (!clean) return;
     localStorage.setItem('tunefree_desktop_pending_query', clean);
     setSearchRequest((prev) => ({ query: clean, nonce: prev.nonce + 1 }));
     onViewChange('search');
   };
 
+  const handleCommandSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    submitSearch(commandQuery);
+  };
+
   return (
     <div className={`desktop-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <header className="window-bar">
-        <div className="window-dots" aria-hidden="true">
-          <span />
-          <span />
-          <span />
+        <div className="window-brand-lockup" aria-label="TuneFree Desktop">
+          <img className="brand-mark" src="/icon.svg" alt="" aria-hidden="true" />
+          <span>Music</span>
         </div>
         {view !== 'search' ? (
           <form className="command-search" onSubmit={handleCommandSearch}>
@@ -98,7 +101,7 @@ export default function DesktopShell({ view, onViewChange }: DesktopShellProps) 
       </main>
 
       <DesktopTransport onExpand={() => setFullPlayerOpen(true)} />
-      <DesktopFullPlayer isOpen={fullPlayerOpen} onClose={() => setFullPlayerOpen(false)} />
+      <DesktopFullPlayer isOpen={fullPlayerOpen} onClose={() => setFullPlayerOpen(false)} onSearch={submitSearch} />
     </div>
   );
 }
