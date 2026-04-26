@@ -16,7 +16,7 @@ export const getStoredProxy = (): string | null =>
 
 /**
  * 获取代理列表 — 自建代理始终排第一位。
- * 若用户未配置代理或配置了自建代理，直接返回默认列表（自建 + corsproxy.io 兜底）；
+ * 若用户未配置代理或配置了自建代理，直接返回默认列表；
  * 若用户配置了第三方代理，自建代理仍排第一，自定义代理作为备用。
  */
 export const getProxies = (): string[] => {
@@ -26,6 +26,7 @@ export const getProxies = (): string[] => {
       : localStorage.getItem("tunefree_cors_proxy");
   if (!stored) return DEFAULT_PROXIES;
   if (stored === SELF_HOSTED_PROXY) return DEFAULT_PROXIES;
+  if (stored.includes('corsproxy.io')) return DEFAULT_PROXIES;
   return [SELF_HOSTED_PROXY, stored];
 };
 
