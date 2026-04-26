@@ -42,7 +42,12 @@ export default function DesktopTransport({ onExpand }: DesktopTransportProps) {
   return (
     <div className="transport mini-player">
       <button type="button" className="transport-main mini-player-summary" onClick={onExpand} aria-label="打开全屏播放器">
-        <CoverArt src={currentSong?.pic} alt={currentSong?.name || 'TuneFree'} className="transport-cover" iconSize={20} />
+        <CoverArt
+          src={currentSong?.pic}
+          alt={currentSong?.name || 'TuneFree'}
+          className={`transport-cover spinning-cover ${isPlaying ? 'is-rotating' : ''}`}
+          iconSize={20}
+        />
         <span className="transport-info">
           <span className="transport-title">{currentSong?.name || '选择一首音乐开始'}</span>
           <span className="transport-artist">{currentSong?.artist || 'TuneFree Desktop'}</span>
