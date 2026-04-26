@@ -1,7 +1,9 @@
-import { useMemo, type CSSProperties } from 'react';
-import AudioVisualizer from '../../core/components/AudioVisualizer';
+import { useMemo, useState, type CSSProperties } from 'react';
 import {
   CloseIcon,
+  DownloadIcon,
+  HeartFillIcon,
+  HeartIcon,
   MusicIcon,
   NextIcon,
   PauseIcon,
@@ -13,6 +15,7 @@ import {
   ShuffleIcon,
   TrashIcon,
 } from '../../core/components/Icons';
+import { useLibrary } from '../../core/contexts/LibraryContext';
 import {
   usePlayerActions,
   usePlayerNowPlaying,
@@ -20,6 +23,7 @@ import {
   usePlayerQueueState,
   usePlayerSettings,
 } from '../../core/contexts/PlayerContext';
+import { getSongUrl, triggerDownload } from '../../core/services/api';
 import type { AudioQuality } from '../../core/types';
 import { isSameSong } from '../../core/types';
 import CoverArt from './CoverArt';
@@ -151,11 +155,20 @@ const buildScoreNotes = (text: string, currentTime: number) => {
 
 const qualityOptions: AudioQuality[] = ['128k', '320k', 'flac', 'flac24bit'];
 
+const downloadMeta: Record<string, { label: string; ext: string }> = {
+  '128k': { label: '128K', ext: 'mp3' },
+  '320k': { label: '320K', ext: 'mp3' },
+  flac: { label: 'FLAC', ext: 'flac' },
+  flac24bit: { label: 'Hi-Res', ext: 'flac' },
+};
+
 export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayerProps) {
   const { currentSong, isPlaying, isLoading } = usePlayerNowPlaying();
   const { currentTime, duration } = usePlayerProgress();
   const { queue, playMode } = usePlayerQueueState();
   const { audioQuality } = usePlayerSettings();
+  const { toggleFavorite, isFavorite } = useLibrary();
+  const [downloadQuality, setDownloadQuality] = useState<AudioQuality | null>(null);
   const {
     playSong,
     clearQueue,
@@ -182,6 +195,22 @@ export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayer
   const panelStyle = currentSong?.pic
     ? ({ '--full-cover-bg': `url(${JSON.stringify(currentSong.pic)})` } as CoverPanelStyle)
     : undefined;
+  const hasSong = !!currentSong;
+  const favoriteActive = hasSong && isFavorite(currentSong.id, currentSong.source);
+  const handleDownload = async (quality: AudioQuality) => {
+    if (!currentSong || downloadQuality) return;
+
+    setDownloadQuality(quality);
+    try {
+      const url = await getSongUrl(currentSong.id, currentSong.source, quality);
+      if (!url) return;
+
+      const meta = downloadMeta[quality] || { label: quality.toUpperCase(), ext: 'mp3' };
+      triggerDownload(url, `${currentSong.artist} - ${currentSong.name}.${meta.ext}`);
+    } finally {
+      setDownloadQuality(null);
+    }
+  };
 
   return (
     <div className={`full-player-layer ${isOpen ? 'open' : ''}`} aria-hidden={!isOpen}>
@@ -205,6 +234,34 @@ export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayer
           <div className="full-song-meta">
             <h2>{currentSong?.name || '未在播放'}</h2>
             <p>{currentSong?.artist || '从排行榜、搜索或资料库中选择音乐'}</p>
+            <div className="full-song-actions" aria-label="歌曲操作">
+              <button
+                type="button"
+                className={`full-action-button ${favoriteActive ? 'active' : ''}`}
+                disabled={!currentSong}
+                onClick={() => currentSong && toggleFavorite(currentSong)}
+              >
+                {favoriteActive ? <HeartFillIcon size={18} /> : <HeartIcon size={18} />}
+                {favoriteActive ? '已喜欢' : '喜欢'}
+              </button>
+              <div className="download-action-group" aria-label="下载音质">
+                {qualityOptions.map((quality) => {
+                  const meta = downloadMeta[quality];
+                  return (
+                    <button
+                      type="button"
+                      className="full-action-button"
+                      disabled={!currentSong || !!downloadQuality}
+                      onClick={() => handleDownload(quality)}
+                      key={quality}
+                    >
+                      <DownloadIcon size={16} />
+                      {downloadQuality === quality ? '获取中' : meta.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -253,9 +310,6 @@ export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayer
                 </p>
               </div>
             )}
-          </div>
-          <div className="full-visualizer">
-            <AudioVisualizer isPlaying={isPlaying} />
           </div>
         </div>
 
@@ -315,6 +369,11 @@ export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayer
         </aside>
 
         <div className="full-player-controls">
+          <div className="transport-wave-bg" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
           <div className="transport-main">
             <CoverArt
               src={currentSong?.pic}
@@ -354,6 +413,15 @@ export default function DesktopFullPlayer({ isOpen, onClose }: DesktopFullPlayer
             </div>
           </div>
           <div className="transport-tools">
+            <button
+              type="button"
+              className={`icon-button transport-like-button ${favoriteActive ? 'active' : ''}`}
+              aria-label={favoriteActive ? '取消喜欢' : '喜欢当前歌曲'}
+              disabled={!currentSong}
+              onClick={() => currentSong && toggleFavorite(currentSong)}
+            >
+              {favoriteActive ? <HeartFillIcon size={16} /> : <HeartIcon size={16} />}
+            </button>
             <button type="button" className="icon-button" aria-label="切换播放模式" onClick={togglePlayMode}>
               {modeIcon}
             </button>

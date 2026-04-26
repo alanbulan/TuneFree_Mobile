@@ -348,14 +348,21 @@ export const getGDStudioLyrics = async (
   }
 
   try {
-    const data = await fetchGDStudioData<{ lyric?: string; tlyric?: string }>({
+    const data = await fetchGDStudioData<{
+      lyric?: string;
+      tlyric?: string;
+      trans?: string;
+      translation?: string;
+    }>({
       types: "lyric",
       source,
       id: requestId,
     });
 
     const main = typeof data?.lyric === "string" ? data.lyric.trim() : "";
-    const trans = typeof data?.tlyric === "string" ? data.tlyric.trim() : "";
+    const trans = [data?.tlyric, data?.trans, data?.translation]
+      .find((value): value is string => typeof value === "string" && value.trim().length > 0)
+      ?.trim() || "";
     const lrc = mergeTranslatedLyrics(main, trans);
 
     lyricCache.set(cacheKey, lrc);
