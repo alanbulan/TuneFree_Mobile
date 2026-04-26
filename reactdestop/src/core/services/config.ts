@@ -24,12 +24,7 @@ export const FORBIDDEN_HEADERS = [
 
 export const PRODUCTION_URL = "https://tunefree-mobile.pages.dev";
 
-const isLocalDesktop =
-  typeof window !== "undefined" &&
-  (window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1");
-
-const proxyBase = isLocalDesktop ? PRODUCTION_URL : "";
+const proxyBase = PRODUCTION_URL;
 
 export const API_PREFIX = proxyBase;
 export const SELF_HOSTED_PROXY = `${proxyBase}/api/cors-proxy?url=`;
