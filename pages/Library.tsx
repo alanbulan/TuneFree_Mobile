@@ -564,7 +564,7 @@ const Library: React.FC = () => {
               <h3 className="font-bold text-lg mb-3 text-ios-text">链接</h3>
               <div className="space-y-3">
                 <a
-                  href="https://xilan.ccwu.cc/"
+                  href="https://music.alanbulan.space/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-xl active:bg-gray-100 transition"
@@ -575,7 +575,7 @@ const Library: React.FC = () => {
                       在线演示
                     </span>
                   </div>
-                  <span className="text-xs text-gray-400">xilan.ccwu.cc</span>
+                  <span className="text-xs text-gray-400">music.alanbulan.space</span>
                 </a>
                 <a
                   href="https://github.com/alanbulan/musicxilan"
