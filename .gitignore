@@ -8,6 +8,11 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.next
+.playwright-mcp
+.reference
+reactdestop/.next
+reactdestop/.reference
 dist
 dist-ssr
 *.local
