@@ -114,6 +114,7 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
   const [showMorePanel, setShowMorePanel] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const lyricListRef = useRef<HTMLDivElement>(null);
+  const lyricScrollKeyRef = useRef('');
   const {
     playSong,
     clearQueue,
@@ -171,16 +172,26 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
   }, [currentSong, isOpen]);
 
   useEffect(() => {
-    if (!lyricListRef.current || activeLyricIndex < 0) return;
+    if (!isOpen || !lyricListRef.current || activeLyricIndex < 0 || lyricRows.length === 0) return;
 
     const container = lyricListRef.current;
-    const activeEl = container.children[activeLyricIndex] as HTMLElement | undefined;
-    if (!activeEl) return;
-    container.scrollTo({
-      top: activeEl.offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2,
-      behavior: 'smooth',
+    const songKey = currentSong ? `${currentSong.source}:${currentSong.id}` : '';
+    const scrollKey = `${songKey}:${lyricRows.length}`;
+    const isInitialScroll = lyricScrollKeyRef.current !== scrollKey;
+    lyricScrollKeyRef.current = scrollKey;
+
+    const frame = window.requestAnimationFrame(() => {
+      const activeEl = container.children[activeLyricIndex] as HTMLElement | undefined;
+      if (!activeEl) return;
+
+      container.scrollTo({
+        top: activeEl.offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2,
+        behavior: isInitialScroll || activeLyricIndex <= 1 ? 'auto' : 'smooth',
+      });
     });
-  }, [activeLyricIndex]);
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeLyricIndex, lyricRows.length, isOpen, currentSong?.id, currentSong?.source]);
 
   const handleDownload = async (quality: AudioQuality) => {
     if (!currentSong || downloadQuality) return;
