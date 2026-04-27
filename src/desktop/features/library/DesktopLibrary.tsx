@@ -323,8 +323,10 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
 
           <div className="about-content-grid">
             <div className="about-card about-feature-card glass-panel">
-              <InfoIcon size={30} />
-              <h3>功能特性</h3>
+              <div className="about-card-heading">
+                <InfoIcon size={30} />
+                <h3>功能特性</h3>
+              </div>
               <div className="about-feature-list">
                 {[
                   ['多源聚合搜索', '支持网易云、QQ 音乐、酷我音乐，以及 JOOX / Bilibili 等 GD Studio 扩展音源。'],
@@ -334,7 +336,6 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
                   ['实时频谱动画', '复用移动端 Web Audio + Canvas 频谱，在进度条区域显示动态波谱背景。'],
                   ['播放状态恢复', '当前歌曲、播放队列、播放模式和默认音质会在浏览器本地保存，刷新后仍能延续。'],
                   ['系统媒体控制', '接入 Media Session，支持系统层面的播放、暂停、上一首、下一首和进度跳转。'],
-                  ['播放容错降级', '高音质地址不可用或浏览器拒播时，会自动回退到 128K，减少播放中断。'],
                 ].map(([title, desc], index) => (
                   <div className="about-feature-item" key={title}>
                     <span>{index + 1}</span>
@@ -349,8 +350,10 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
 
             <div className="about-side-stack">
               <div className="about-card about-tech-card glass-panel">
-                <SettingsIcon size={30} />
-                <h3>桌面端技术栈</h3>
+                <div className="about-card-heading">
+                  <SettingsIcon size={30} />
+                  <h3>桌面端技术栈</h3>
+                </div>
                 <div className="about-tech-grid">
                   {desktopTechStack.map((tech) => (
                     <span className="about-tech-chip" key={tech.name}>
@@ -366,8 +369,10 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
               </div>
 
               <div className="about-card about-api-card glass-panel">
-                <InfoIcon size={30} />
-                <h3>后端 API 与数据源</h3>
+                <div className="about-card-heading">
+                  <InfoIcon size={30} />
+                  <h3>后端 API 与数据源</h3>
+                </div>
                 <p>音乐数据由 TuneHub API 与 {GD_STUDIO_ATTRIBUTION} 共同提供。TuneHub 负责原有解析链路；GD Studio 负责 JOOX、Bilibili 等扩展源。</p>
                 <p>JOOX 扩展源建议控制频率：{GD_STUDIO_RATE_LIMIT_HINT}。歌词是否双语取决于上游返回字段，桌面端会自动合并 lyric / tlyric / trans / translation。</p>
                 <div className="about-link-row">
