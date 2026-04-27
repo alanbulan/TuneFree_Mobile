@@ -1236,18 +1236,18 @@ img { display: block; }
   grid-template-columns: 300px minmax(320px, 1fr) 330px;
   align-items: center;
   gap: 18px;
-  min-height: 104px;
-  margin: 6px -8px -4px;
-  padding: 14px 8px 6px;
+  min-height: 116px;
+  margin: 0 -8px -4px;
+  padding: 18px 8px 8px;
   overflow: hidden;
   border-top: 0;
 }
 .full-player-controls > *:not(.transport-wave-bg) { position: relative; z-index: 1; }
 .transport-wave-bg {
   position: absolute;
-  inset: auto 22px 7px;
+  inset: auto 22px 8px;
   z-index: 0;
-  height: 54px;
+  height: 72px;
   overflow: hidden;
   border-radius: 0;
   background: transparent;
@@ -1257,7 +1257,7 @@ img { display: block; }
   mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
 }
-.mini-wave-bg { inset: auto 22px 7px; opacity: .42; }
+.mini-wave-bg { inset: auto 22px 8px; opacity: .42; }
 .transport-wave-bg::before,
 .transport-wave-bg::after { content: none; }
 .transport-wave-bg canvas {
@@ -1268,7 +1268,7 @@ img { display: block; }
   height: 100%;
   opacity: .36;
   mix-blend-mode: multiply;
-  transform: scaleY(.48);
+  transform: scaleY(.72);
   transform-origin: center bottom;
 }
 .transport-like-button.active { color: var(--ios-red); background: rgba(250,35,59,.10); }
