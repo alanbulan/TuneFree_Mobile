@@ -113,6 +113,8 @@ out/
 
 Cloudflare Pages 推荐配置：
 
+- **Production branch**：`desktop`
+- **Root directory**：留空或 `/`，不要再填旧的 `reactdestop`
 - **Framework preset**：Next.js / Static HTML
 - **Build command**：`npm run build`
 - **Build output directory**：`out`

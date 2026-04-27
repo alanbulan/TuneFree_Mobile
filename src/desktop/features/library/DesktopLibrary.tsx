@@ -195,23 +195,31 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
 
       {activeView === 'playlists' && !selectedPlaylist && (
         <section className="playlist-grid">
-          <div className="create-card">
-            <div style={{ width: '100%' }}>
-              <PlusIcon size={32} />
-              <h3>新建歌单</h3>
-              <div className="panel-field">
+          <div className="create-card playlist-action-card">
+            <div className="playlist-action-card-body">
+              <span className="playlist-card-icon"><PlusIcon size={36} /></span>
+              <div className="playlist-action-copy">
+                <p className="eyebrow">Create</p>
+                <h3>新建歌单</h3>
+                <p>从空白歌单开始整理收藏，适合按场景或心情归类。</p>
+              </div>
+              <div className="panel-field playlist-panel-field">
                 <input className="panel-input" value={newPlaylistName} onChange={(event) => setNewPlaylistName(event.target.value)} placeholder="歌单名称" />
               </div>
-              <button type="button" className="primary-button" onClick={handleCreatePlaylist}>创建</button>
+              <button type="button" className="primary-button playlist-card-button" onClick={handleCreatePlaylist}>创建</button>
             </div>
           </div>
 
-          <div className="create-card">
-            <div style={{ width: '100%' }}>
-              <DownloadIcon size={32} />
-              <h3>导入在线歌单</h3>
-              <div className="panel-field">
-                <div className="source-option-row compact" role="radiogroup" aria-label="选择导入音源">
+          <div className="create-card playlist-action-card playlist-import-card">
+            <div className="playlist-action-card-body">
+              <span className="playlist-card-icon"><DownloadIcon size={36} /></span>
+              <div className="playlist-action-copy">
+                <p className="eyebrow">Import</p>
+                <h3>导入在线歌单</h3>
+                <p>粘贴歌单 ID，一次同步到本地资料库。</p>
+              </div>
+              <div className="panel-field playlist-panel-field">
+                <div className="source-option-row compact playlist-source-options" role="radiogroup" aria-label="选择导入音源">
                   {importSourceOptions.map((source) => (
                     <button
                       type="button"
@@ -227,7 +235,7 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
                 </div>
                 <input className="panel-input" value={importId} onChange={(event) => setImportId(event.target.value)} placeholder="歌单 ID" />
               </div>
-              <button type="button" className="primary-button" disabled={isImporting} onClick={handleImportOnlinePlaylist}>{isImporting ? '导入中…' : '导入'}</button>
+              <button type="button" className="primary-button playlist-card-button" disabled={isImporting} onClick={handleImportOnlinePlaylist}>{isImporting ? '导入中…' : '导入'}</button>
             </div>
           </div>
 
@@ -299,73 +307,79 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
         <section className="about-grid about-grid-rich">
           <div className="about-card about-hero-card glass-panel">
             <div className="about-app-icon"><MusicIcon size={38} /></div>
-            <div>
+            <div className="about-hero-copy">
               <h3>TuneFree Desktop</h3>
               <p>一个与 iOS PWA 隔离的桌面音乐体验，保留移动端的多源聚合、无损音质、歌词解析和本地资料库，同时为 PC 端重做侧栏、表格、队列和底部播放器。</p>
               <span className="about-version">Desktop Web · v1.2.0</span>
             </div>
           </div>
 
-          <div className="about-card glass-panel">
-            <InfoIcon size={30} />
-            <h3>功能特性</h3>
-            <div className="about-feature-list">
-              {[
-                ['多源聚合搜索', '支持网易云、QQ 音乐、酷我音乐，以及 JOOX / Bilibili 等 GD Studio 扩展音源。'],
-                ['桌面级播放体验', '常驻底部迷你播放器、全屏播放器、播放队列、喜欢收藏、下载和音质切换。'],
-                ['逐行滚动歌词', '支持 LRC 时间轴、双语歌词合并、点击歌词跳转，以及基于歌词内容的乐谱动画。'],
-                ['本地资料库', '收藏、歌单、在线歌单导入、JSON 备份导入导出均保存在浏览器本地。'],
-                ['实时频谱动画', '复用移动端 Web Audio + Canvas 频谱，在进度条区域显示动态波谱背景。'],
-              ].map(([title, desc], index) => (
-                <div className="about-feature-item" key={title}>
-                  <span>{index + 1}</span>
-                  <div>
-                    <strong>{title}</strong>
-                    <p>{desc}</p>
+          <div className="about-content-grid">
+            <div className="about-card about-feature-card glass-panel">
+              <InfoIcon size={30} />
+              <h3>功能特性</h3>
+              <div className="about-feature-list">
+                {[
+                  ['多源聚合搜索', '支持网易云、QQ 音乐、酷我音乐，以及 JOOX / Bilibili 等 GD Studio 扩展音源。'],
+                  ['桌面级播放体验', '常驻底部迷你播放器、全屏播放器、播放队列、喜欢收藏、下载和音质切换。'],
+                  ['逐行滚动歌词', '支持 LRC 时间轴、双语歌词合并、点击歌词跳转，以及基于歌词内容的乐谱动画。'],
+                  ['本地资料库', '收藏、歌单、在线歌单导入、JSON 备份导入导出均保存在浏览器本地。'],
+                  ['实时频谱动画', '复用移动端 Web Audio + Canvas 频谱，在进度条区域显示动态波谱背景。'],
+                ].map(([title, desc], index) => (
+                  <div className="about-feature-item" key={title}>
+                    <span>{index + 1}</span>
+                    <div>
+                      <strong>{title}</strong>
+                      <p>{desc}</p>
+                    </div>
                   </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="about-side-stack">
+              <div className="about-card about-tech-card glass-panel">
+                <SettingsIcon size={30} />
+                <h3>桌面端技术栈</h3>
+                <div className="about-tech-grid">
+                  {desktopTechStack.map((tech) => (
+                    <span className="about-tech-chip" key={tech.name}>
+                      <span className="about-tech-icon">{tech.icon}</span>
+                      <span>
+                        <strong>{tech.name}</strong>
+                        <em>{tech.detail}</em>
+                      </span>
+                    </span>
+                  ))}
                 </div>
-              ))}
+                <p>桌面版已提升到仓库根目录，使用 Next.js 静态导出部署；API 代理通过同源 Cloudflare Pages Functions 提供，不影响原 iOS PWA。</p>
+              </div>
+
+              <div className="about-card about-api-card glass-panel">
+                <InfoIcon size={30} />
+                <h3>后端 API 与数据源</h3>
+                <p>音乐数据由 TuneHub API 与 {GD_STUDIO_ATTRIBUTION} 共同提供。TuneHub 负责原有解析链路；GD Studio 负责 JOOX、Bilibili 等扩展源。</p>
+                <p>JOOX 扩展源建议控制频率：{GD_STUDIO_RATE_LIMIT_HINT}。歌词是否双语取决于上游返回字段，桌面端会自动合并 lyric / tlyric / trans / translation。</p>
+                <div className="about-link-row">
+                  <a href="https://linux.do/t/topic/1326425" target="_blank" rel="noopener noreferrer"><ExternalLinkIcon size={13} /> TuneHub 原帖</a>
+                  <a href="https://music.gdstudio.xyz/" target="_blank" rel="noopener noreferrer"><ExternalLinkIcon size={13} /> GD 音乐台</a>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="about-card glass-panel">
-            <SettingsIcon size={30} />
-            <h3>桌面端技术栈</h3>
-            <div className="about-tech-grid">
-              {desktopTechStack.map((tech) => (
-                <span className="about-tech-chip" key={tech.name}>
-                  <span className="about-tech-icon">{tech.icon}</span>
-                  <span>
-                    <strong>{tech.name}</strong>
-                    <em>{tech.detail}</em>
-                  </span>
-                </span>
-              ))}
-            </div>
-            <p>桌面版位于独立的 reactdestop 目录，使用 Next.js 静态导出部署；API 代理通过同源 Cloudflare Pages Functions 提供，不影响原 iOS PWA。</p>
+          <div className="about-link-grid">
+            <a className="about-card glass-panel about-link-card" href="https://music.alanbulan.space/" target="_blank" rel="noopener noreferrer">
+              <ExternalLinkIcon size={30} />
+              <h3>在线演示</h3>
+              <p>music.alanbulan.space</p>
+            </a>
+            <a className="about-card glass-panel about-link-card" href="https://github.com/alanbulan/musicxilan" target="_blank" rel="noopener noreferrer">
+              <GithubIcon size={30} />
+              <h3>GitHub 仓库</h3>
+              <p>alanbulan/musicxilan</p>
+            </a>
           </div>
-
-          <div className="about-card glass-panel">
-            <InfoIcon size={30} />
-            <h3>后端 API 与数据源</h3>
-            <p>音乐数据由 TuneHub API 与 {GD_STUDIO_ATTRIBUTION} 共同提供。TuneHub 负责原有解析链路；GD Studio 负责 JOOX、Bilibili 等扩展源。</p>
-            <p>JOOX 扩展源建议控制频率：{GD_STUDIO_RATE_LIMIT_HINT}。歌词是否双语取决于上游返回字段，桌面端会自动合并 lyric / tlyric / trans / translation。</p>
-            <div className="about-link-row">
-              <a href="https://linux.do/t/topic/1326425" target="_blank" rel="noopener noreferrer"><ExternalLinkIcon size={13} /> TuneHub 原帖</a>
-              <a href="https://music.gdstudio.xyz/" target="_blank" rel="noopener noreferrer"><ExternalLinkIcon size={13} /> GD 音乐台</a>
-            </div>
-          </div>
-
-          <a className="about-card glass-panel about-link-card" href="https://music.alanbulan.space/" target="_blank" rel="noopener noreferrer">
-            <ExternalLinkIcon size={30} />
-            <h3>在线演示</h3>
-            <p>music.alanbulan.space</p>
-          </a>
-          <a className="about-card glass-panel about-link-card" href="https://github.com/alanbulan/musicxilan" target="_blank" rel="noopener noreferrer">
-            <GithubIcon size={30} />
-            <h3>GitHub 仓库</h3>
-            <p>alanbulan/musicxilan</p>
-          </a>
 
           <div className="about-card about-notice-card glass-panel">
             <h3>声明</h3>
