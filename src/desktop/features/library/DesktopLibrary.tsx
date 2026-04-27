@@ -264,7 +264,7 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
 
       {activeView === 'settings' && (
         <section className="settings-grid">
-          <div className="settings-card glass-panel">
+          <div className="settings-card settings-core-card glass-panel">
             <h3><SettingsIcon size={18} /> 核心设置</h3>
             <div className="panel-field">
               <label>TuneHub API Key</label>
@@ -279,14 +279,16 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
               <label>CORS 代理</label>
               <input className="panel-input" placeholder="留空使用内置代理（推荐）" value={tempProxy} onChange={(event) => setTempProxy(event.target.value)} />
             </div>
-            <button type="button" className="primary-button" onClick={() => {
-              setApiKey(tempApiKey);
-              setCorsProxy(tempProxy);
-              setApiBase(tempApiBase);
-              showMessage('设置已保存');
-            }}>
-              <KeyIcon size={16} /> 保存配置
-            </button>
+            <div className="settings-save-row">
+              <button type="button" className="primary-button" onClick={() => {
+                setApiKey(tempApiKey);
+                setCorsProxy(tempProxy);
+                setApiBase(tempApiBase);
+                showMessage('设置已保存');
+              }}>
+                <KeyIcon size={16} /> 保存配置
+              </button>
+            </div>
           </div>
 
           <div className="settings-card settings-backup-card glass-panel">
