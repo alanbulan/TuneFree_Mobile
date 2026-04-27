@@ -289,10 +289,15 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
             </button>
           </div>
 
-          <div className="settings-card glass-panel">
-            <h3><UploadIcon size={18} /> 数据备份</h3>
-            <p>桌面端与移动 PWA 使用相同 localStorage key，因此可以导出/导入同一份收藏与歌单数据。</p>
-            <div className="panel-actions">
+          <div className="settings-card settings-backup-card glass-panel">
+            <span className="settings-card-icon"><UploadIcon size={22} /></span>
+            <h3>数据备份</h3>
+            <p>收藏、歌单与导入的在线歌单都保存在浏览器本地；导出的 JSON 会包含版本号、导出时间、收藏列表和歌单列表。</p>
+            <div className="backup-detail-list">
+              <span>同一 localStorage key 可在桌面端与移动 PWA 间迁移</span>
+              <span>导入 JSON 后会覆盖并恢复收藏与歌单数据</span>
+            </div>
+            <div className="panel-actions backup-actions">
               <button type="button" className="soft-button" onClick={exportData}>导出 JSON</button>
               <label className="soft-button">
                 导入数据
@@ -325,6 +330,9 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
                   ['逐行滚动歌词', '支持 LRC 时间轴、双语歌词合并、点击歌词跳转，以及基于歌词内容的乐谱动画。'],
                   ['本地资料库', '收藏、歌单、在线歌单导入、JSON 备份导入导出均保存在浏览器本地。'],
                   ['实时频谱动画', '复用移动端 Web Audio + Canvas 频谱，在进度条区域显示动态波谱背景。'],
+                  ['播放状态恢复', '当前歌曲、播放队列、播放模式和默认音质会在浏览器本地保存，刷新后仍能延续。'],
+                  ['系统媒体控制', '接入 Media Session，支持系统层面的播放、暂停、上一首、下一首和进度跳转。'],
+                  ['播放容错降级', '高音质地址不可用或浏览器拒播时，会自动回退到 128K，减少播放中断。'],
                 ].map(([title, desc], index) => (
                   <div className="about-feature-item" key={title}>
                     <span>{index + 1}</span>
@@ -334,24 +342,6 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
                     </div>
                   </div>
                 ))}
-              </div>
-              <div className="about-proof-panel">
-                <p className="eyebrow">Source-backed details</p>
-                <div className="about-proof-grid">
-                  {[
-                    ['持久化播放现场', '当前歌曲、播放队列、播放模式和默认音质会写入 localStorage，刷新后仍能恢复。'],
-                    ['音质与下载一致', '底部播放器提供 128K、320K、FLAC、Hi-Res 选项，下载时按当前音质生成 mp3 / flac 文件名。'],
-                    ['异常自动降级', '高音质地址不可用或浏览器拒播时，播放器会自动回退到 128K，减少播放中断。'],
-                    ['系统媒体控制', '接入 Media Session，向系统提供歌曲名、艺人、封面、进度，以及播放 / 暂停 / 上下首 / 跳转控制。'],
-                    ['歌词补全策略', '当当前歌词缺少翻译且音源支持时，会再次请求歌词并合并双语行。'],
-                    ['资料库备份', '收藏和歌单使用 tunefree_favorites / tunefree_playlists 保存，导出 JSON 带 version 与 exportDate。'],
-                  ].map(([title, desc]) => (
-                    <div className="about-proof-item" key={title}>
-                      <strong>{title}</strong>
-                      <p>{desc}</p>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
 
