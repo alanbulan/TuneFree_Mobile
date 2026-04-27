@@ -52,7 +52,7 @@ img { display: block; }
   grid-template-columns: 216px minmax(0, 1fr);
   grid-template-rows: 54px minmax(0, 1fr) 96px;
   overflow: hidden;
-  background: var(--ios-card);
+  background: var(--ios-bg);
   transition: grid-template-columns .28s cubic-bezier(.2,.8,.2,1);
 }
 .desktop-shell::before,
@@ -355,12 +355,10 @@ img { display: block; }
   align-items: center;
   gap: 18px;
   min-height: 96px;
-  padding: 12px 18px 14px;
+  padding: 12px 22px 14px;
   overflow: hidden;
-  border-top: 1px solid var(--line);
-  background: rgba(255,255,255,.92);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
+  border: 0;
+  background: transparent;
   z-index: 3;
   outline: none;
 }
@@ -1238,12 +1236,11 @@ img { display: block; }
   grid-template-columns: 300px minmax(320px, 1fr) 330px;
   align-items: center;
   gap: 18px;
-  min-height: 116px;
-  margin: 0 -14px -8px;
-  padding: 18px 14px 8px;
+  min-height: 104px;
+  margin: 6px -8px -4px;
+  padding: 14px 8px 6px;
   overflow: hidden;
-  border-top: 1px solid rgba(0,0,0,.07);
-  border-radius: 0 0 24px 24px;
+  border-top: 0;
 }
 .full-player-controls > *:not(.transport-wave-bg) { position: relative; z-index: 1; }
 .transport-wave-bg {
