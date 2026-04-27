@@ -335,6 +335,24 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
                   </div>
                 ))}
               </div>
+              <div className="about-proof-panel">
+                <p className="eyebrow">Source-backed details</p>
+                <div className="about-proof-grid">
+                  {[
+                    ['持久化播放现场', '当前歌曲、播放队列、播放模式和默认音质会写入 localStorage，刷新后仍能恢复。'],
+                    ['音质与下载一致', '底部播放器提供 128K、320K、FLAC、Hi-Res 选项，下载时按当前音质生成 mp3 / flac 文件名。'],
+                    ['异常自动降级', '高音质地址不可用或浏览器拒播时，播放器会自动回退到 128K，减少播放中断。'],
+                    ['系统媒体控制', '接入 Media Session，向系统提供歌曲名、艺人、封面、进度，以及播放 / 暂停 / 上下首 / 跳转控制。'],
+                    ['歌词补全策略', '当当前歌词缺少翻译且音源支持时，会再次请求歌词并合并双语行。'],
+                    ['资料库备份', '收藏和歌单使用 tunefree_favorites / tunefree_playlists 保存，导出 JSON 带 version 与 exportDate。'],
+                  ].map(([title, desc]) => (
+                    <div className="about-proof-item" key={title}>
+                      <strong>{title}</strong>
+                      <p>{desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="about-side-stack">
