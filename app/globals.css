@@ -766,11 +766,11 @@ img { display: block; }
 .about-notice-card { grid-column: 1 / -1; }
 .about-hero-card {
   display: grid;
-  grid-template-columns: auto minmax(0, 780px);
+  grid-template-columns: minmax(180px, .58fr) minmax(0, 760px) minmax(120px, .32fr);
   align-items: center;
-  gap: 26px;
+  gap: 34px;
   min-height: 230px;
-  padding: 34px;
+  padding: 34px clamp(72px, 7vw, 132px);
   background:
     radial-gradient(circle at 7% 26%, rgba(250,35,59,.18), transparent 18rem),
     radial-gradient(circle at 92% 10%, rgba(0,122,255,.08), transparent 24rem),
@@ -787,6 +787,7 @@ img { display: block; }
   border: 34px solid rgba(250,35,59,.045);
 }
 .about-app-icon {
+  justify-self: center;
   width: 96px;
   height: 96px;
   display: grid;
@@ -796,7 +797,7 @@ img { display: block; }
   background: linear-gradient(135deg, #fa233b, #ff6f7d);
   box-shadow: 0 22px 46px rgba(250,35,59,.28);
 }
-.about-hero-copy { position: relative; z-index: 1; }
+.about-hero-copy { position: relative; z-index: 1; justify-self: center; width: 100%; }
 .about-hero-copy h3 { margin: 0 0 10px; font-size: clamp(26px, 2.2vw, 36px); letter-spacing: -.055em; }
 .about-hero-copy p { max-width: 760px; font-size: 14px; line-height: 1.85; }
 .about-version { display: inline-flex; margin-top: 14px; border-radius: 999px; padding: 7px 12px; color: var(--ios-red); background: rgba(250,35,59,.09); font-size: 11px; font-weight: 900; }
@@ -1302,8 +1303,9 @@ img { display: block; }
   .transport-tools { display: none; }
   .hero-grid, .search-layout, .settings-grid, .about-grid, .about-content-grid, .about-link-grid, .playlist-grid { grid-template-columns: 1fr; }
   .playlist-action-card, .playlist-grid .library-card { min-height: auto; }
-  .about-hero-card { grid-template-columns: 1fr; }
-  .about-app-icon { width: 82px; height: 82px; }
+  .about-hero-card { grid-template-columns: 1fr; padding: 28px; }
+  .about-app-icon { justify-self: start; width: 82px; height: 82px; }
+  .about-hero-copy { justify-self: start; }
   .table-head, .song-row { grid-template-columns: 34px minmax(0,1fr) 72px; }
   .song-album, .table-head span:nth-child(3), .table-head span:nth-child(5), .table-actions { display: none; }
   .full-player-panel { left: 8px; right: 8px; bottom: 8px; height: calc(100% - 16px); grid-template-columns: 1fr; grid-template-rows: auto minmax(0,1fr) auto; padding: 58px 18px 18px; }
