@@ -6,6 +6,7 @@ import DesktopSearch from '../features/search/DesktopSearch';
 import type { DesktopView, LibraryView } from '../types';
 import DesktopFullPlayer from './DesktopFullPlayer';
 import DesktopTransport from './DesktopTransport';
+import MiraPet from './MiraPet';
 
 interface DesktopShellProps {
   view: DesktopView;
@@ -97,6 +98,7 @@ export default function DesktopShell({ view, onViewChange }: DesktopShellProps) 
         </div>
       </main>
 
+      <MiraPet />
       <DesktopTransport onExpand={() => setFullPlayerOpen(true)} />
       <DesktopFullPlayer isOpen={fullPlayerOpen} onClose={() => setFullPlayerOpen(false)} onSearch={submitSearch} />
     </div>

@@ -1,18 +1,4 @@
-import { DEFAULT_API_BASE, DEFAULT_PROXIES, SELF_HOSTED_PROXY } from "./config";
-
-// ==============================
-// localStorage 读取工具
-// ==============================
-
-export const getStoredApiKey = (): string =>
-  typeof window === "undefined"
-    ? ""
-    : localStorage.getItem("tunefree_api_key") || "";
-
-export const getStoredProxy = (): string | null =>
-  typeof window === "undefined"
-    ? null
-    : localStorage.getItem("tunefree_cors_proxy") || null;
+import { DEFAULT_PROXIES, SELF_HOSTED_PROXY } from "./config";
 
 /**
  * 获取代理列表 — 自建代理始终排第一位。
@@ -28,18 +14,6 @@ export const getProxies = (): string[] => {
   if (stored === SELF_HOSTED_PROXY) return DEFAULT_PROXIES;
   if (stored.includes('corsproxy.io')) return DEFAULT_PROXIES;
   return [SELF_HOSTED_PROXY, stored];
-};
-
-/**
- * 获取存储的 API Base，末尾斜杠会被移除，防止拼接时出现双斜杠。
- */
-export const getStoredApiBase = (): string => {
-  let base =
-    typeof window === "undefined"
-      ? DEFAULT_API_BASE
-      : localStorage.getItem("tunefree_api_base") || DEFAULT_API_BASE;
-  if (base.endsWith("/")) base = base.slice(0, -1);
-  return base;
 };
 
 // ==============================

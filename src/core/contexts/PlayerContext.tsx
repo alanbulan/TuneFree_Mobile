@@ -94,6 +94,11 @@ const PlayerAnalyserContext =
 const PlayerProgressContext =
   createContext<PlayerProgressType | undefined>(undefined);
 
+type ParsedSongData = NonNullable<Awaited<ReturnType<typeof parseSongFull>>>;
+
+const getFiniteAudioDuration = (audio: HTMLAudioElement): number =>
+  Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -119,6 +124,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   // 标记当前 Audio 是否已被 AudioContext 接管路由（一旦接管，不支持 CORS 的源会静音）
   const audioCtxConnectedRef = useRef(false);
+  const playRequestIdRef = useRef(0);
+  const parsedSongCacheRef = useRef<Map<string, ParsedSongData>>(new Map());
+  const preloadedAudioRef = useRef<{
+    key: string;
+    audio: HTMLAudioElement;
+  } | null>(null);
 
   // Refs to solve Stale Closure issues in Event Listeners
   const playNextRef = useRef<((force?: boolean) => void) | null>(null);
@@ -158,6 +169,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   const handlersRef = useRef<{
     timeupdate: () => void;
     loadedmetadata: () => void;
+    durationchange: () => void;
     ended: () => void;
     error: (e: any) => void;
     waiting: () => void;
@@ -179,6 +191,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         oldAudio.removeEventListener(
           "loadedmetadata",
           handlersRef.current.loadedmetadata,
+        );
+        oldAudio.removeEventListener(
+          "durationchange",
+          handlersRef.current.durationchange,
         );
         oldAudio.removeEventListener("ended", handlersRef.current.ended);
         oldAudio.removeEventListener("error", handlersRef.current.error);
@@ -204,23 +220,39 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       audio.crossOrigin = "anonymous";
     }
 
+    const syncDuration = () => {
+      const nextDuration = getFiniteAudioDuration(audio);
+      if (nextDuration > 0) setDuration(nextDuration);
+      return nextDuration;
+    };
+
+    const syncMediaPosition = () => {
+      const nextDuration = syncDuration();
+      if ("mediaSession" in navigator && nextDuration > 0) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: nextDuration,
+            playbackRate: audio.playbackRate,
+            position: audio.currentTime,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+
     const handlers = {
-      timeupdate: () => setCurrentTime(audio.currentTime),
+      timeupdate: () => {
+        setCurrentTime(audio.currentTime);
+        syncMediaPosition();
+      },
       loadedmetadata: () => {
-        setDuration(audio.duration);
+        syncMediaPosition();
         setIsLoading(false);
         retryCountRef.current = 0;
-        if ("mediaSession" in navigator && !isNaN(audio.duration)) {
-          try {
-            navigator.mediaSession.setPositionState({
-              duration: audio.duration,
-              playbackRate: audio.playbackRate,
-              position: audio.currentTime,
-            });
-          } catch (e) {
-            /* ignore */
-          }
-        }
+      },
+      durationchange: () => {
+        syncDuration();
       },
       ended: () => {
         console.log("[Player] 歌曲播放结束，触发自动播放下一首");
@@ -255,6 +287,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
     audio.addEventListener("timeupdate", handlers.timeupdate);
     audio.addEventListener("loadedmetadata", handlers.loadedmetadata);
+    audio.addEventListener("durationchange", handlers.durationchange);
     audio.addEventListener("ended", handlers.ended);
     audio.addEventListener("error", handlers.error);
     audio.addEventListener("waiting", handlers.waiting);
@@ -282,11 +315,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
             "loadedmetadata",
             handlersRef.current.loadedmetadata,
           );
+          audio.removeEventListener(
+            "durationchange",
+            handlersRef.current.durationchange,
+          );
           audio.removeEventListener("ended", handlersRef.current.ended);
           audio.removeEventListener("error", handlersRef.current.error);
           audio.removeEventListener("waiting", handlersRef.current.waiting);
           audio.removeEventListener("canplay", handlersRef.current.canplay);
         }
+      }
+      const preloaded = preloadedAudioRef.current;
+      if (preloaded) {
+        preloaded.audio.pause();
+        preloaded.audio.removeAttribute("src");
+        preloaded.audio.load();
+        preloadedAudioRef.current = null;
       }
       if (audioCtxRef.current) {
         audioCtxRef.current.close();
@@ -328,33 +372,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  // 页面可见性变化：后台时断开 Web Audio 路由让 Audio 直接播放，前台时重连可视化
   useEffect(() => {
     const handleVisibility = () => {
       const ctx = audioCtxRef.current;
-      const source = sourceNodeRef.current;
-      const node = analyserRef.current;
-
-      if (document.visibilityState === "hidden") {
-        // 后台：断开 AudioContext 路由，让 HTMLAudioElement 直接输出
-        // iOS Safari 会 suspend AudioContext 导致路由中的音频停止
-        if (ctx && source && node) {
-          try {
-            source.disconnect();
-            node.disconnect();
-          } catch {}
-        }
-      } else {
-        // 前台：恢复 AudioContext 并重连可视化管线
-        if (ctx && ctx.state === "suspended") {
-          ctx.resume();
-        }
-        if (ctx && source && node) {
-          try {
-            source.connect(node);
-            node.connect(ctx.destination);
-          } catch {}
-        }
+      if (document.visibilityState === "visible" && ctx?.state === "suspended") {
+        ctx.resume();
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
@@ -390,57 +412,150 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const updatePositionState = useCallback(() => {
-    if (
-      "mediaSession" in navigator &&
-      audioRef.current &&
-      !isNaN(audioRef.current.duration)
-    ) {
-      try {
-        navigator.mediaSession.setPositionState({
-          duration: audioRef.current.duration,
-          playbackRate: audioRef.current.playbackRate,
-          position: audioRef.current.currentTime,
-        });
-      } catch {
-        /* ignore */
-      }
+    if (!("mediaSession" in navigator) || !audioRef.current) return;
+
+    const nextDuration = getFiniteAudioDuration(audioRef.current);
+    if (nextDuration <= 0) return;
+
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: nextDuration,
+        playbackRate: audioRef.current.playbackRate,
+        position: audioRef.current.currentTime,
+      });
+    } catch {
+      /* ignore */
     }
   }, []);
+
+  const getParsedSongCacheKey = useCallback(
+    (song: Pick<Song, "id" | "source">, quality: AudioQuality) =>
+      `${getSongKey(song)}:${quality}`,
+    [],
+  );
+
+  const resolveParsedSong = useCallback(
+    async (song: Song, quality: AudioQuality): Promise<ParsedSongData | null> => {
+      const cacheKey = getParsedSongCacheKey(song, quality);
+      const cached = parsedSongCacheRef.current.get(cacheKey);
+      if (cached) return cached;
+
+      const parsed = await parseSongFull(song.id, song.source, quality, song);
+      if (parsed) parsedSongCacheRef.current.set(cacheKey, parsed);
+      return parsed;
+    },
+    [getParsedSongCacheKey],
+  );
+
+  const clearPreloadedAudio = useCallback((cacheKey?: string) => {
+    const preloaded = preloadedAudioRef.current;
+    if (!preloaded || (cacheKey && preloaded.key !== cacheKey)) return;
+
+    preloaded.audio.pause();
+    preloaded.audio.removeAttribute("src");
+    preloaded.audio.load();
+    preloadedAudioRef.current = null;
+  }, []);
+
+  const preloadAudioUrl = useCallback(
+    (cacheKey: string, url: string) => {
+      if (preloadedAudioRef.current?.key === cacheKey) return;
+
+      clearPreloadedAudio();
+      const audio = new Audio();
+      audio.preload = "auto";
+      (audio as any).playsInline = true;
+      audio.src = url;
+      audio.load();
+      preloadedAudioRef.current = { key: cacheKey, audio };
+    },
+    [clearPreloadedAudio],
+  );
+
+  const preloadNextSong = useCallback(
+    (song: Song) => {
+      const nextIndex = getNextQueueIndex(
+        queueRef.current,
+        song,
+        playModeRef.current,
+      );
+      if (nextIndex < 0) return;
+
+      const nextSong = queueRef.current[nextIndex];
+      if (!nextSong || isSameSong(nextSong, song)) return;
+
+      const quality = audioQualityRef.current;
+      const cacheKey = getParsedSongCacheKey(nextSong, quality);
+      if (preloadedAudioRef.current?.key === cacheKey) return;
+
+      void resolveParsedSong(nextSong, quality)
+        .then((parsed) => {
+          if (!parsed?.url) return;
+          if (getParsedSongCacheKey(nextSong, audioQualityRef.current) !== cacheKey) {
+            return;
+          }
+
+          preloadAudioUrl(cacheKey, parsed.url);
+          const patch: Partial<Song> = { url: parsed.url };
+          if (parsed.pic && !nextSong.pic) patch.pic = parsed.pic;
+          if (parsed.lrc) patch.lrc = parsed.lrc;
+          setQueue((prev) => {
+            const next = prev.map((queuedSong) =>
+              isSameSong(queuedSong, nextSong)
+                ? { ...queuedSong, ...patch }
+                : queuedSong,
+            );
+            queueRef.current = next;
+            return next;
+          });
+        })
+        .catch((error) => {
+          console.warn("Preload next song failed:", error);
+        });
+    },
+    [getParsedSongCacheKey, preloadAudioUrl, resolveParsedSong],
+  );
 
   const playSong = useCallback(
     async (song: Song, forceQuality?: AudioQuality) => {
       if (!audioRef.current) return;
 
-      // Determine effective quality
+      const requestId = ++playRequestIdRef.current;
       const targetQuality = forceQuality || audioQualityRef.current;
-
       const isCurrentSong = isSameSong(currentSongRef.current, song);
       const isDifferentQuality =
         forceQuality && forceQuality !== audioQualityRef.current;
 
-      // Logic: If same song, same quality, and audio has source -> toggle via audioRef directly
       if (isCurrentSong && !isDifferentQuality && !forceQuality) {
-        if (
-          audioRef.current.src &&
-          audioRef.current.src !== window.location.href
-        ) {
-          if (!audioRef.current.paused) {
-            audioRef.current.pause();
+        const activeAudio = audioRef.current;
+        if (activeAudio.src && activeAudio.src !== window.location.href) {
+          if (!activeAudio.paused) {
+            activeAudio.pause();
             setIsPlaying(false);
+            setIsLoading(false);
             updateMediaSession(currentSongRef.current, "paused");
           } else {
-            audioRef.current.play().catch(() => {});
-            setIsPlaying(true);
-            updateMediaSession(currentSongRef.current, "playing");
+            setIsLoading(true);
+            try {
+              await activeAudio.play();
+              if (requestId !== playRequestIdRef.current) return;
+              setIsPlaying(true);
+              setIsLoading(false);
+              updateMediaSession(currentSongRef.current, "playing");
+              preloadNextSong(song);
+            } catch (error) {
+              if (requestId !== playRequestIdRef.current) return;
+              console.error("Play resume failed:", error);
+              setIsPlaying(false);
+              setIsLoading(false);
+            }
           }
           return;
         }
       }
 
       setIsLoading(true);
-      if (!forceQuality) {
-        retryCountRef.current = 0; // Reset retry if user manually clicked a new song
-      }
+      if (!forceQuality) retryCountRef.current = 0;
 
       if (!isCurrentSong) {
         audioRef.current.pause();
@@ -453,43 +568,46 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
       let fullSong = { ...song };
       setCurrentSong(fullSong);
+      currentSongRef.current = fullSong;
 
-      // Queue management
       setQueue((prev) => {
-        if (prev.find((s) => isSameSong(s, song))) return prev;
-        return [...prev, fullSong];
+        const next = prev.find((s) => isSameSong(s, song))
+          ? prev
+          : [...prev, fullSong];
+        queueRef.current = next;
+        return next;
       });
 
       try {
-        // 单次 parse 获取 url / 歌词 / 封面，避免重复消耗积分
-        const parsed = await parseSongFull(
-          song.id,
-          song.source,
-          targetQuality,
-          song,
-        );
+        const parsed = await resolveParsedSong(song, targetQuality);
 
-        // Race condition check
-        if (!isSameSong(currentSongRef.current, song)) {
+        if (
+          requestId !== playRequestIdRef.current ||
+          !isSameSong(currentSongRef.current, song)
+        ) {
           return;
         }
 
-        // 用 parse 返回的完整数据补全封面和歌词
         if (parsed) {
-          if ((parsed.pic && !fullSong.pic) || parsed.lrc) {
-            const patch: Partial<Song> = {};
-            if (parsed.pic && !fullSong.pic) patch.pic = parsed.pic;
-            if (parsed.lrc) patch.lrc = parsed.lrc;
+          const patch: Partial<Song> = {};
+          if (parsed.url) patch.url = parsed.url;
+          if (parsed.pic && !fullSong.pic) patch.pic = parsed.pic;
+          if (parsed.lrc) patch.lrc = parsed.lrc;
+
+          if (Object.keys(patch).length > 0) {
             fullSong = { ...fullSong, ...patch };
+            currentSongRef.current = fullSong;
             setCurrentSong((prev) => {
               if (!isSameSong(prev, song) || !prev) return prev;
               return { ...prev, ...patch };
             });
-            setQueue((prev) =>
-              prev.map((s) =>
+            setQueue((prev) => {
+              const next = prev.map((s) =>
                 isSameSong(s, song) ? { ...s, ...patch } : s,
-              ),
-            );
+              );
+              queueRef.current = next;
+              return next;
+            });
           }
 
           if (
@@ -514,17 +632,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (url) {
           fullSong.url = url;
+          const cacheKey = getParsedSongCacheKey(song, targetQuality);
+          const preloadedCurrentAudio = preloadedAudioRef.current;
           const resumeTime =
             isCurrentSong && isDifferentQuality ? audioRef.current.currentTime : 0;
-
-          // 酷我 CDN 不支持 CORS，crossOrigin="anonymous" 会导致请求失败
-          // createMediaElementSource 绑定后的 Audio 播放非 CORS 源也会静音
-          // 需要根据源切换 Audio 元素：CORS 源用带 crossOrigin 的 Audio + AudioContext，非 CORS 源用干净 Audio
           const needsCors =
             !url.includes("kuwo.cn") && !url.includes("sycdn.kuwo");
 
-          if (!needsCors) {
-            // 非 CORS 源（酷我）：需要无 crossOrigin 的干净 Audio
+          if (isIOSRef.current) {
+            if (audioCtxConnectedRef.current || audioRef.current.crossOrigin) {
+              createAudioElement(false);
+            }
+          } else if (!needsCors) {
             if (audioCtxConnectedRef.current || audioRef.current.crossOrigin) {
               console.log(
                 "[Player] 切换到无 CORS Audio（酷我源），可视化使用模拟模式",
@@ -532,72 +651,61 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
               createAudioElement(false);
             }
           } else {
-            // CORS 源：确保 AudioContext 已初始化
-            if (!audioCtxConnectedRef.current) {
-              createAudioElement(true);
-            }
+            if (!audioCtxConnectedRef.current) createAudioElement(true);
             initAudioContext();
           }
 
-          audioRef.current.src = url;
-          audioRef.current.load();
+          const activeAudio = audioRef.current;
+          if (!activeAudio) return;
 
-          if (resumeTime > 0) {
-            audioRef.current.currentTime = resumeTime;
+          activeAudio.src = url;
+          activeAudio.load();
+
+          if (preloadedCurrentAudio?.key === cacheKey) {
+            const preloadedDuration = getFiniteAudioDuration(
+              preloadedCurrentAudio.audio,
+            );
+            if (preloadedDuration > 0) setDuration(preloadedDuration);
+            clearPreloadedAudio(cacheKey);
           }
 
-          if (
-            audioCtxRef.current &&
-            audioCtxRef.current.state === "suspended"
-          ) {
+          if (resumeTime > 0) activeAudio.currentTime = resumeTime;
+
+          if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
             audioCtxRef.current.resume();
           }
 
-          // 乐观更新：先设置播放状态，避免切换音质时 UI 闪烁到暂停
-          setIsPlaying(true);
-          setIsLoading(false);
+          try {
+            await activeAudio.play();
+            if (requestId !== playRequestIdRef.current) return;
+            setIsPlaying(true);
+            setIsLoading(false);
+            updateMediaSession(fullSong, "playing");
+            preloadNextSong(fullSong);
+          } catch (error: any) {
+            if (requestId !== playRequestIdRef.current) return;
+            if (error?.name === "AbortError") return;
 
-          const playPromise = audioRef.current.play();
-          if (playPromise !== undefined) {
-            playPromise
-              .then(() => {
-                updateMediaSession(fullSong, "playing");
-              })
-              .catch((error) => {
-                // AbortError: play() 被新的 load() 中断（切换音质场景），忽略
-                if (error.name === "AbortError") {
-                  console.log(
-                    "[Player] play() 被中断（AbortError），等待新请求",
-                  );
-                  return;
-                }
+            console.error("Play start failed:", error?.name, error?.message);
 
-                console.error("Play start failed:", error.name, error.message);
+            if (
+              (error?.name === "NotSupportedError" ||
+                String(error?.message || "").includes("source")) &&
+              retryCountRef.current === 0 &&
+              targetQuality !== "128k"
+            ) {
+              console.warn(
+                "Play promise rejected with source error, triggering fallback to 128k",
+              );
+              retryCountRef.current = 1;
+              playSongRef.current(song, "128k");
+              return;
+            }
 
-                // Handle "NotSupportedError" (Format not supported/Source invalid)
-                // Trigger fallback if we haven't already
-                if (
-                  (error.name === "NotSupportedError" ||
-                    error.message.includes("source")) &&
-                  retryCountRef.current === 0 &&
-                  targetQuality !== "128k"
-                ) {
-                  console.warn(
-                    "Play promise rejected with source error, triggering fallback to 128k",
-                  );
-                  retryCountRef.current = 1;
-                  playSongRef.current(song, "128k");
-                  return;
-                }
-
-                if (error.name === "NotAllowedError") {
-                  setIsPlaying(false);
-                  setIsLoading(false);
-                }
-              });
+            setIsPlaying(false);
+            setIsLoading(false);
           }
         } else {
-          // URL is null (Strict check failed in api.ts)
           console.warn(`No valid URL for ${song.name} [${targetQuality}]`);
 
           if (targetQuality !== "128k" && retryCountRef.current === 0) {
@@ -607,16 +715,31 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
             return;
           }
 
+          audioRef.current.pause();
+          audioRef.current.removeAttribute("src");
+          audioRef.current.load();
+          setCurrentTime(0);
+          setDuration(0);
           setIsLoading(false);
           setIsPlaying(false);
-          // alert('无法播放此歌曲'); // Optional: show toast
         }
       } catch (err) {
-        setIsLoading(false);
+        if (requestId === playRequestIdRef.current) {
+          setIsLoading(false);
+          setIsPlaying(false);
+        }
         console.error("Error in playSong", err);
       }
     },
-    [createAudioElement, initAudioContext, updateMediaSession],
+    [
+      clearPreloadedAudio,
+      createAudioElement,
+      getParsedSongCacheKey,
+      initAudioContext,
+      preloadNextSong,
+      resolveParsedSong,
+      updateMediaSession,
+    ],
   );
 
   // 始终保持 playSongRef 指向最新的 playSong，避免 stale closure
@@ -637,19 +760,32 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       audioCtxRef.current.resume();
     }
 
-    // 使用 audioRef.current.paused 代替 isPlaying state，避免 stale closure
     if (!audioRef.current.paused) {
+      playRequestIdRef.current += 1;
       audioRef.current.pause();
       setIsPlaying(false);
+      setIsLoading(false);
       updateMediaSession(currentSongRef.current, "paused");
     } else {
+      const requestId = ++playRequestIdRef.current;
+      setIsLoading(true);
       audioRef.current
         .play()
-        .catch((e) => console.error("Toggle play error", e));
-      setIsPlaying(true);
-      updateMediaSession(currentSongRef.current, "playing");
+        .then(() => {
+          if (requestId !== playRequestIdRef.current) return;
+          setIsPlaying(true);
+          setIsLoading(false);
+          updateMediaSession(currentSongRef.current, "playing");
+          if (currentSongRef.current) preloadNextSong(currentSongRef.current);
+        })
+        .catch((e) => {
+          if (requestId !== playRequestIdRef.current) return;
+          console.error("Toggle play error", e);
+          setIsPlaying(false);
+          setIsLoading(false);
+        });
     }
-  }, [updateMediaSession]);
+  }, [preloadNextSong, updateMediaSession]);
 
   const seek = useCallback((time: number) => {
     if (audioRef.current) {
@@ -657,7 +793,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       setCurrentTime(time);
       updatePositionState();
     }
-  }, []);
+  }, [updatePositionState]);
 
   const playNext = useCallback((force = true) => {
     const q = queueRef.current;
@@ -679,7 +815,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     const nextIndex = getNextQueueIndex(q, c, mode);
     if (nextIndex < 0) return;
 
-    playSongRef.current(q[nextIndex]);
+    const nextSong = q[nextIndex];
+    if (!nextSong) return;
+
+    if (c && isSameSong(nextSong, c)) {
+      playSongRef.current(nextSong, audioQualityRef.current);
+      return;
+    }
+
+    playSongRef.current(nextSong);
   }, []);
 
   const playPrev = useCallback(() => {
@@ -723,6 +867,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [currentSong, isPlaying, updateMediaSession]);
 
+  useEffect(() => {
+    if (!currentSong || !isPlaying) return;
+    preloadNextSong(currentSong);
+  }, [audioQuality, currentSong, isPlaying, playMode, preloadNextSong, queue]);
+
   const addToQueue = useCallback((song: Song) => {
     setQueue((prev) => {
       if (prev.find((s) => isSameSong(s, song))) return prev;
@@ -742,8 +891,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const clearQueue = useCallback(() => {
+    clearPreloadedAudio();
     setQueue([]);
-  }, []);
+  }, [clearPreloadedAudio]);
 
   const togglePlayMode = useCallback(() => {
     setPlayMode((prev) => {

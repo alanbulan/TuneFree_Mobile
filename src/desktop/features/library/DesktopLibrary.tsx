@@ -4,13 +4,11 @@ import {
   CloudIcon,
   CodeIcon,
   DatabaseIcon,
-  DownloadIcon,
   ExternalLinkIcon,
   FileCodeIcon,
   FolderIcon,
   GithubIcon,
   InfoIcon,
-  KeyIcon,
   MusicIcon,
   PanelsIcon,
   PlusIcon,
@@ -22,10 +20,9 @@ import {
 } from '../../../core/components/Icons';
 import { useLibrary } from '../../../core/contexts/LibraryContext';
 import { usePlayerActions, usePlayerNowPlaying } from '../../../core/contexts/PlayerContext';
-import { DEFAULT_API_BASE, getPlaylistDetail } from '../../../core/services/api';
 import type { Playlist } from '../../../core/types';
 import type { LibraryView } from '../../types';
-import { GD_STUDIO_ATTRIBUTION, GD_STUDIO_RATE_LIMIT_HINT, getMusicSourceLabel } from '../../../core/utils/musicSource';
+import { GD_STUDIO_ATTRIBUTION, GD_STUDIO_RATE_LIMIT_HINT } from '../../../core/utils/musicSource';
 import SongTable from '../../components/SongTable';
 
 const viewMeta: Record<LibraryView, { eyebrow: string; title: string }> = {
@@ -34,10 +31,9 @@ const viewMeta: Record<LibraryView, { eyebrow: string; title: string }> = {
   settings: { eyebrow: 'Control Panel', title: '管理' },
   about: { eyebrow: 'About TuneFree', title: '关于' },
 };
-const importSourceOptions = ['netease', 'qq', 'kuwo'];
 const desktopTechStack = [
   { name: 'Next.js 15', detail: 'App Router', icon: <RocketIcon size={18} /> },
-  { name: 'React 19', detail: 'Client UI', icon: <CodeIcon size={18} /> },
+  { name: 'React 18', detail: 'Client UI', icon: <CodeIcon size={18} /> },
   { name: 'TypeScript', detail: 'Typed Core', icon: <FileCodeIcon size={18} /> },
   { name: 'Static Export', detail: 'Edge Pages', icon: <CloudIcon size={18} /> },
   { name: 'Cloudflare Pages', detail: 'Deploy', icon: <ServerIcon size={18} /> },
@@ -55,14 +51,9 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
   const {
     favorites,
     playlists,
-    apiKey,
     corsProxy,
-    apiBase,
-    setApiKey,
     setCorsProxy,
-    setApiBase,
     createPlaylist,
-    importPlaylist,
     deletePlaylist,
     renamePlaylist,
     removeFromPlaylist,
@@ -73,12 +64,7 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
   const { currentSong, isPlaying } = usePlayerNowPlaying();
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [newPlaylistName, setNewPlaylistName] = useState('');
-  const [importId, setImportId] = useState('');
-  const [importSource, setImportSource] = useState('netease');
-  const [isImporting, setIsImporting] = useState(false);
-  const [tempApiKey, setTempApiKey] = useState(apiKey);
   const [tempProxy, setTempProxy] = useState(corsProxy);
-  const [tempApiBase, setTempApiBase] = useState(apiBase);
   const [message, setMessage] = useState('');
 
   const selectedPlaylist = useMemo(
@@ -102,19 +88,6 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
     createPlaylist(name);
     setNewPlaylistName('');
     showMessage(`已创建「${name}」`);
-  };
-
-  const handleImportOnlinePlaylist = async () => {
-    if (!importId.trim()) return;
-    setIsImporting(true);
-    const result = await getPlaylistDetail(importId.trim(), importSource);
-    if (result) {
-      importPlaylist(result.name, result.songs);
-      showMessage(`成功导入「${result.name}」`);
-    } else {
-      showMessage('导入失败，请检查 Key、ID 或音源');
-    }
-    setIsImporting(false);
   };
 
   const handleFileImport = (file?: File) => {
@@ -210,44 +183,6 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
             </div>
           </div>
 
-          <div className="create-card playlist-action-card playlist-import-card">
-            <div className="playlist-action-card-body">
-              <span className="playlist-card-icon"><DownloadIcon size={36} /></span>
-              <div className="playlist-action-copy">
-                <p className="eyebrow">Import</p>
-                <h3>导入在线歌单</h3>
-                <p>粘贴歌单 ID，一次同步到本地资料库。</p>
-              </div>
-              <div className="panel-field playlist-panel-field">
-                <div className="source-option-row compact playlist-source-options" role="radiogroup" aria-label="选择导入音源">
-                  {importSourceOptions.map((source) => (
-                    <button
-                      type="button"
-                      key={source}
-                      role="radio"
-                      aria-checked={importSource === source}
-                      className={`source-option ${importSource === source ? 'active' : ''}`}
-                      onClick={() => setImportSource(source)}
-                    >
-                      {getMusicSourceLabel(source, 'full')}
-                    </button>
-                  ))}
-                </div>
-                <input className="panel-input" value={importId} onChange={(event) => setImportId(event.target.value)} placeholder="歌单 ID" />
-              </div>
-              <button type="button" className="primary-button playlist-card-button" disabled={isImporting} onClick={handleImportOnlinePlaylist}>{isImporting ? '导入中…' : '导入'}</button>
-            </div>
-          </div>
-
-          {isImporting && (
-            <div className="library-card skeleton-library-card" aria-busy="true" aria-label="歌单导入中">
-              <span className="skeleton-block skeleton-card-icon" />
-              <span className="skeleton-line skeleton-card-title" />
-              <span className="skeleton-line skeleton-card-subtitle" />
-              <span className="skeleton-line skeleton-card-subtitle short" />
-            </div>
-          )}
-
           {playlists.map((playlist) => (
             <button type="button" className="library-card" key={playlist.id} onClick={() => setSelectedPlaylistId(playlist.id)}>
               <FolderIcon size={34} className="muted-text" />
@@ -267,26 +202,15 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
           <div className="settings-card settings-core-card glass-panel">
             <h3><SettingsIcon size={18} /> 核心设置</h3>
             <div className="panel-field">
-              <label>TuneHub API Key</label>
-              <input className="panel-input" type="password" placeholder="th_xxxxxxxxxxxx" value={tempApiKey} onChange={(event) => setTempApiKey(event.target.value)} />
-            </div>
-            <div className="panel-field">
-              <label>API Base URL</label>
-              <input className="panel-input" placeholder={DEFAULT_API_BASE} value={tempApiBase} onChange={(event) => setTempApiBase(event.target.value)} />
-              <p className="muted-text">默认为 {DEFAULT_API_BASE}，如遇接口故障可尝试更换。</p>
-            </div>
-            <div className="panel-field">
               <label>CORS 代理</label>
               <input className="panel-input" placeholder="留空使用内置代理（推荐）" value={tempProxy} onChange={(event) => setTempProxy(event.target.value)} />
             </div>
             <div className="settings-save-row">
               <button type="button" className="primary-button" onClick={() => {
-                setApiKey(tempApiKey);
                 setCorsProxy(tempProxy);
-                setApiBase(tempApiBase);
                 showMessage('设置已保存');
               }}>
-                <KeyIcon size={16} /> 保存配置
+                保存配置
               </button>
             </div>
           </div>
@@ -294,7 +218,7 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
           <div className="settings-card settings-backup-card glass-panel">
             <span className="settings-card-icon"><UploadIcon size={22} /></span>
             <h3>数据备份</h3>
-            <p>收藏、歌单与导入的在线歌单都保存在浏览器本地；导出的 JSON 会包含版本号、导出时间、收藏列表和歌单列表。</p>
+            <p>收藏与本地歌单都保存在浏览器本地；导出的 JSON 会包含版本号、导出时间、收藏列表和歌单列表。</p>
             <div className="backup-detail-list">
               <span>同一 localStorage key 可在桌面端与移动 PWA 间迁移</span>
               <span>导入 JSON 后会覆盖并恢复收藏与歌单数据</span>
@@ -316,7 +240,7 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
             <div className="about-app-icon"><MusicIcon size={38} /></div>
             <div className="about-hero-copy">
               <h3>TuneFree Desktop</h3>
-              <p>一个与 iOS PWA 隔离的桌面音乐体验，保留移动端的多源聚合、无损音质、歌词解析和本地资料库，同时为 PC 端重做侧栏、表格、队列和底部播放器。</p>
+              <p>一个与 iOS PWA 隔离的桌面音乐体验，保留多源聚合、无损音质、歌词解析和本地资料库，并在 v1.2.0 加入更稳定的播放链路与可拖动 Mira 桌面宠物。</p>
               <span className="about-version">Desktop Web · v1.2.0</span>
             </div>
           </div>
@@ -330,9 +254,12 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
               <div className="about-feature-list">
                 {[
                   ['多源聚合搜索', '支持网易云、QQ 音乐、酷我音乐，以及 JOOX / Bilibili 等 GD Studio 扩展音源。'],
+                  ['TuneHub 解耦', '移除已关闭的 TuneHub / TuneFree API，搜索与播放不再依赖失效链路。'],
                   ['桌面级播放体验', '常驻底部迷你播放器、全屏播放器、播放队列、喜欢收藏、下载和音质切换。'],
+                  ['稳定播放链路', '修复 URL 解析竞态、duration 同步、无音频 URL 清理和下一首预加载。'],
+                  ['Mira 桌面宠物', '左下角常驻、可拖动、保存位置，并按加载、播放、暂停和左右移动展示状态反馈。'],
                   ['逐行滚动歌词', '支持 LRC 时间轴、双语歌词合并、点击歌词跳转，以及基于歌词内容的乐谱动画。'],
-                  ['本地资料库', '收藏、歌单、在线歌单导入、JSON 备份导入导出均保存在浏览器本地。'],
+                  ['本地资料库', '收藏、歌单、JSON 备份导入导出均保存在浏览器本地。'],
                   ['实时频谱动画', '复用移动端 Web Audio + Canvas 频谱，在进度条区域显示动态波谱背景。'],
                   ['播放状态恢复', '当前歌曲、播放队列、播放模式和默认音质会在浏览器本地保存，刷新后仍能延续。'],
                   ['系统媒体控制', '接入 Media Session，支持系统层面的播放、暂停、上一首、下一首和进度跳转。'],
@@ -373,10 +300,9 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
                   <InfoIcon size={30} />
                   <h3>后端 API 与数据源</h3>
                 </div>
-                <p>音乐数据由 TuneHub API 与 {GD_STUDIO_ATTRIBUTION} 共同提供。TuneHub 负责原有解析链路；GD Studio 负责 JOOX、Bilibili 等扩展源。</p>
+                <p>桌面版已移除 TuneHub / TuneFree API 依赖：网易云、QQ 音乐、酷我音乐使用直连接口与同源 /api/url 解析；JOOX、Bilibili 等扩展源由 {GD_STUDIO_ATTRIBUTION} 提供。</p>
                 <p>JOOX 扩展源建议控制频率：{GD_STUDIO_RATE_LIMIT_HINT}。歌词是否双语取决于上游返回字段，桌面端会自动合并 lyric / tlyric / trans / translation。</p>
                 <div className="about-link-row">
-                  <a href="https://linux.do/t/topic/1326425" target="_blank" rel="noopener noreferrer"><ExternalLinkIcon size={13} /> TuneHub 原帖</a>
                   <a href="https://music.gdstudio.xyz/" target="_blank" rel="noopener noreferrer"><ExternalLinkIcon size={13} /> GD 音乐台</a>
                 </div>
               </div>

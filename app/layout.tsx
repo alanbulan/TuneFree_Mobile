@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'TuneFree Desktop',
-  description: 'TuneFree desktop music experience',
+  description: '桌面端多源音乐播放器，包含稳定播放链路、GD Studio 扩展源和可拖动 Mira 桌面宠物',
   icons: { icon: '/icon.svg' },
 };
 

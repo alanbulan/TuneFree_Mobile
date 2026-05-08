@@ -2,7 +2,7 @@
   <h1>TuneFree Desktop</h1>
 
   <p align="center">
-    <strong>面向 Web PC / 桌面端的 TuneFree Next.js 音乐播放器</strong>
+    <strong>面向 Web PC / 桌面端的 TuneFree Next.js 音乐播放器 · Desktop Web v1.2.0</strong>
   </p>
 
   <p>
@@ -49,7 +49,7 @@
 - iOS/PWA React：`ios-pwa-react/` → `origin/main`
 - Flutter：`flutter/` → `origin/flutter`
 
-本分支是桌面 Web 客户端，使用 Next.js App Router 组织页面，并将原移动端能力改造成主流音乐软件的 PC 布局体验。
+本分支是桌面 Web 客户端，使用 Next.js App Router 组织页面，并将原移动端能力改造成主流音乐软件的 PC 布局体验。Desktop Web v1.2.0 重点完成 TuneHub / TuneFree API 移除、播放链路稳定性修复，以及可拖动 Mira 桌面宠物接入。
 
 ## ✨ 功能特性
 
@@ -60,10 +60,13 @@
 - **主工作区**：榜单、推荐、资料库和结果列表适配宽屏展示。
 - **底部迷你播放器**：固定在窗口底部，支持播放控制、进度、队列和歌词摘要。
 - **全屏播放器**：点击迷你播放器进入沉浸式播放页，展示封面、歌词、队列和交互按钮。
+- **Mira 桌面宠物**：左下角常驻、可拖动、会保存位置，并通过气泡反馈播放、加载、暂停和移动状态。
 
 ### 🎵 音乐播放体验
 
-- **多源解析**：复用 TuneFree 音乐源服务，支持网易云、QQ、酷我等来源。
+- **多源搜索与解析**：网易云、QQ、酷我使用直连接口与同源 `/api/url` 解析，JOOX / Bilibili 等扩展源由 GD Studio 提供。
+- **移除 TuneHub 依赖**：桌面版不再依赖已关闭的 TuneHub / TuneFree API，避免失效解析链路影响播放。
+- **稳定播放链路**：修复 URL 解析竞态、duration 同步、无音频 URL 清理和下一首预加载，减少封面/歌词已加载但音频不播放的问题。
 - **双语歌词**：统一 LRC 解析，支持网易云/QQ 翻译歌词回退和合并展示。
 - **歌词追踪**：根据播放进度定位当前歌词，开头和切歌场景自动追踪。
 - **播放队列**：支持队列列表、当前播放态、高亮和快捷切歌。
