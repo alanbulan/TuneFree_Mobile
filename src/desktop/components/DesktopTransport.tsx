@@ -24,6 +24,7 @@ import { getLyrics, getSongUrl, triggerDownload } from '../../core/services/api'
 import type { AudioQuality } from '../../core/types';
 import { findActiveLyricIndex, hasTranslatedLyrics, parseLyrics, supportsTranslatedLyricFallback } from '../../core/utils/lyrics';
 import CoverArt from './CoverArt';
+import { useToast } from './ToastHost';
 
 interface DesktopTransportProps {
   onExpand: () => void;
@@ -51,6 +52,7 @@ export default function DesktopTransport({ onExpand }: DesktopTransportProps) {
   const { audioQuality } = usePlayerSettings();
   const { toggleFavorite, isFavorite } = useLibrary();
   const { togglePlay, playNext, playPrev, seek, togglePlayMode, setAudioQuality } = usePlayerActions();
+  const { showToast } = useToast();
   const [downloading, setDownloading] = useState(false);
   const [lyricsOverride, setLyricsOverride] = useState('');
 
@@ -83,16 +85,32 @@ export default function DesktopTransport({ onExpand }: DesktopTransportProps) {
     };
   }, [currentSong, lyricsOverride]);
 
+  const handleToggleFavorite = () => {
+    if (!currentSong) return;
+    const wasFavorite = isFavorite(currentSong.id, currentSong.source);
+    toggleFavorite(currentSong);
+    showToast(wasFavorite ? '已取消收藏' : '已收藏歌曲', 'success', {
+      label: '撤销',
+      onClick: () => currentSong && toggleFavorite(currentSong),
+    });
+  };
+
   const handleDownload = async () => {
     if (!currentSong || downloading) return;
 
     setDownloading(true);
     try {
       const url = await getSongUrl(currentSong.id, currentSong.source, audioQuality);
-      if (!url) return;
+      if (!url) {
+        showToast('无法获取下载地址', 'error');
+        return;
+      }
 
       const meta = downloadMeta[audioQuality] || { ext: 'mp3' };
       triggerDownload(url, `${currentSong.artist} - ${currentSong.name}.${meta.ext}`);
+      showToast('已开始下载', 'success');
+    } catch {
+      showToast('下载失败，请稍后再试', 'error');
     } finally {
       setDownloading(false);
     }
@@ -154,7 +172,7 @@ export default function DesktopTransport({ onExpand }: DesktopTransportProps) {
           className={`icon-button transport-like-button ${favoriteActive ? 'active' : ''}`}
           aria-label={favoriteActive ? '取消喜欢' : '喜欢当前歌曲'}
           disabled={!currentSong}
-          onClick={() => currentSong && toggleFavorite(currentSong)}
+          onClick={handleToggleFavorite}
         >
           {favoriteActive ? <HeartFillIcon size={16} /> : <HeartIcon size={16} />}
         </button>
@@ -175,6 +193,7 @@ export default function DesktopTransport({ onExpand }: DesktopTransportProps) {
             key={quality}
             type="button"
             className={`quality-button ${audioQuality === quality ? 'active' : ''}`}
+            aria-pressed={audioQuality === quality}
             onClick={() => setAudioQuality(quality)}
           >
             {quality === 'flac24bit' ? 'Hi-Res' : quality.toUpperCase()}

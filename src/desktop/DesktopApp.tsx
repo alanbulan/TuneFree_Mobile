@@ -4,7 +4,17 @@ import { useEffect, useState } from 'react';
 import { LibraryProvider } from '../core/contexts/LibraryContext';
 import { PlayerProvider } from '../core/contexts/PlayerContext';
 import DesktopShell from './components/DesktopShell';
+import { ToastProvider } from './components/ToastHost';
 import type { DesktopView } from './types';
+
+const viewPaths: Record<DesktopView, string> = {
+  home: '/',
+  search: '/search',
+  favorites: '/library',
+  playlists: '/library/playlists',
+  settings: '/library/settings',
+  about: '/library/about',
+};
 
 const getViewFromPath = (fallback: DesktopView): DesktopView => {
   if (typeof window === 'undefined') return fallback;
@@ -25,25 +35,28 @@ export default function DesktopApp({ initialView = 'home' }: { initialView?: Des
     setView(nextView);
   }, [initialView]);
 
+  useEffect(() => {
+    const syncViewFromPath = () => setView(getViewFromPath(initialView));
+    window.addEventListener('popstate', syncViewFromPath);
+    return () => window.removeEventListener('popstate', syncViewFromPath);
+  }, [initialView]);
+
   const handleViewChange = (nextView: DesktopView) => {
     setView(nextView);
-    const paths: Record<DesktopView, string> = {
-      home: '/',
-      search: '/search',
-      favorites: '/library',
-      playlists: '/library/playlists',
-      settings: '/library/settings',
-      about: '/library/about',
-    };
-    window.history.pushState({}, '', paths[nextView]);
+    const nextPath = viewPaths[nextView];
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, '', nextPath);
+    }
   };
 
   return (
     <LibraryProvider>
       <PlayerProvider>
-        <div className="desktop-app">
-          <DesktopShell view={view} onViewChange={handleViewChange} />
-        </div>
+        <ToastProvider>
+          <div className="desktop-app">
+            <DesktopShell view={view} onViewChange={handleViewChange} />
+          </div>
+        </ToastProvider>
       </PlayerProvider>
     </LibraryProvider>
   );

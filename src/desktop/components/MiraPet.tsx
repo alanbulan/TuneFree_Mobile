@@ -161,6 +161,10 @@ export default function MiraPet() {
     savePosition(next);
   };
 
+  const interact = () => {
+    applyMovementAction(actionName === 'waving' ? 'jumping' : 'waving', true);
+  };
+
   const nudgePosition = (dx: number, dy: number) => {
     const { width, height } = getPetSize();
     setPosition((current) => {
@@ -312,6 +316,8 @@ export default function MiraPet() {
       nudgePosition(0, step);
     } else if (event.key === 'Home') {
       resetPosition();
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      interact();
     } else {
       return;
     }
@@ -334,7 +340,11 @@ export default function MiraPet() {
     ? '向左移动中'
     : movementAction === 'running_right'
       ? '向右移动中'
-      : null;
+      : movementAction === 'waving'
+        ? '向你打招呼'
+        : movementAction === 'jumping'
+          ? '开心跳一下'
+          : null;
   const statusText = dragging ? (movementStatusText ?? '拖动中，松手保存位置') : (movementStatusText ?? MIRA_STATUS_LABELS[mood]);
   const petClassName = `mira-pet is-${mood}${dragging ? ' is-dragging' : ''}${movementAction ? ' is-moving' : ''}`;
 
@@ -345,7 +355,7 @@ export default function MiraPet() {
       style={petStyle}
       role="button"
       tabIndex={0}
-      aria-label={`Mira 桌面宠物，${statusText}。可拖动，也可以用方向键移动，Home 键回到默认位置。`}
+      aria-label={`Mira 桌面宠物，${statusText}。Enter 或空格互动，方向键移动，Home 键回到默认位置。`}
       title={`${statusText} · 拖动可调整位置`}
       data-action={action.name}
       onPointerDown={handlePointerDown}

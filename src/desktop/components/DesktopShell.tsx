@@ -1,5 +1,6 @@
-import { FormEvent, useState } from 'react';
-import { ExternalLinkIcon, HeartIcon, HomeIcon, LibraryIcon, SearchIcon, SettingsIcon, SidebarCollapseIcon, SidebarExpandIcon } from '../../core/components/Icons';
+import { FormEvent, useEffect, useState } from 'react';
+import { HeartIcon, HomeIcon, InfoIcon, LibraryIcon, SearchIcon, SettingsIcon, SidebarCollapseIcon, SidebarExpandIcon } from '../../core/components/Icons';
+import { usePlayerNotice } from '../../core/contexts/PlayerContext';
 import DesktopHome from '../features/home/DesktopHome';
 import DesktopLibrary from '../features/library/DesktopLibrary';
 import DesktopSearch from '../features/search/DesktopSearch';
@@ -7,6 +8,7 @@ import type { DesktopView, LibraryView } from '../types';
 import DesktopFullPlayer from './DesktopFullPlayer';
 import DesktopTransport from './DesktopTransport';
 import MiraPet from './MiraPet';
+import { useToast } from './ToastHost';
 
 interface DesktopShellProps {
   view: DesktopView;
@@ -19,16 +21,22 @@ const navItems: { view: DesktopView; label: string; icon: React.ReactNode }[] = 
   { view: 'favorites', label: '收藏', icon: <HeartIcon size={17} /> },
   { view: 'playlists', label: '歌单', icon: <LibraryIcon size={17} /> },
   { view: 'settings', label: '管理', icon: <SettingsIcon size={17} /> },
-  { view: 'about', label: '关于', icon: <ExternalLinkIcon size={17} /> },
+  { view: 'about', label: '关于', icon: <InfoIcon size={17} /> },
 ];
 
 const libraryViews: LibraryView[] = ['favorites', 'playlists', 'settings', 'about'];
 
 export default function DesktopShell({ view, onViewChange }: DesktopShellProps) {
+  const { playerNotice } = usePlayerNotice();
+  const { showToast } = useToast();
   const [commandQuery, setCommandQuery] = useState('');
   const [searchRequest, setSearchRequest] = useState({ query: '', nonce: 0 });
   const [fullPlayerOpen, setFullPlayerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (playerNotice) showToast(playerNotice.message, playerNotice.tone);
+  }, [playerNotice, showToast]);
 
   const submitSearch = (query: string) => {
     const clean = query.trim();
@@ -53,7 +61,7 @@ export default function DesktopShell({ view, onViewChange }: DesktopShellProps) 
         {view !== 'search' ? (
           <form className="command-search" onSubmit={handleCommandSearch}>
             <SearchIcon size={15} />
-            <input value={commandQuery} onChange={(event) => setCommandQuery(event.target.value)} placeholder="搜索" />
+            <input aria-label="搜索音乐" value={commandQuery} onChange={(event) => setCommandQuery(event.target.value)} placeholder="搜索" />
           </form>
         ) : <div />}
         <div />
@@ -78,6 +86,7 @@ export default function DesktopShell({ view, onViewChange }: DesktopShellProps) 
               key={item.view}
               type="button"
               className={`nav-button ${view === item.view ? 'active' : ''}`}
+              aria-current={view === item.view ? 'page' : undefined}
               title={item.label}
               onClick={() => onViewChange(item.view)}
             >

@@ -1,4 +1,4 @@
-import { HeartIcon, MoreIcon, MusicIcon, PlayIcon } from '../../core/components/Icons';
+import { HeartFillIcon, HeartIcon, MoreIcon, MusicIcon, PlayIcon, TrashIcon } from '../../core/components/Icons';
 import { getImgReferrerPolicy } from '../../core/services/api';
 import { Song, isSameSong } from '../../core/types';
 import { getMusicSourceLabel } from '../../core/utils/musicSource';
@@ -14,7 +14,10 @@ interface SongTableProps {
   actionLabel?: string;
   onPlay: (song: Song) => void;
   onFavorite?: (song: Song) => void;
+  isFavorite?: (song: Song) => boolean;
   onMore?: (song: Song) => void;
+  onDelete?: (song: Song) => void;
+  deleteLabel?: string;
 }
 
 export default function SongTable({
@@ -27,7 +30,10 @@ export default function SongTable({
   actionLabel = '播放',
   onPlay,
   onFavorite,
+  isFavorite,
   onMore,
+  onDelete,
+  deleteLabel = '删除歌曲',
 }: SongTableProps) {
   if (isLoading && songs.length === 0) {
     return (
@@ -92,16 +98,21 @@ export default function SongTable({
           const title = typeof song.name === 'string' ? song.name : '未知歌曲';
           const artist = typeof song.artist === 'string' ? song.artist : '未知歌手';
           const album = typeof song.album === 'string' && song.album ? song.album : '未知专辑';
+          const favoriteActive = Boolean(isFavorite?.(song));
           return (
             <div
               role="button"
               tabIndex={0}
+              aria-label={`播放 ${title} - ${artist}`}
               className={`song-row ${current ? 'current' : ''}`}
               key={`${song.source}-${song.id}-${index}`}
               style={style}
               onClick={() => onPlay(song)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') onPlay(song);
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onPlay(song);
+                }
               }}
             >
               <span className="song-index">{current && isPlaying ? '▶' : String(index + 1).padStart(2, '0')}</span>
@@ -120,10 +131,21 @@ export default function SongTable({
               </span>
               <span className="song-album">{album}</span>
               <span className="source-badge">{getMusicSourceLabel(song.source)}</span>
-              <span className="table-actions" onClick={(event) => event.stopPropagation()}>
+              <span
+                className="table-actions"
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
                 {onFavorite && (
-                  <button type="button" className="table-action" aria-label="收藏歌曲" onClick={() => onFavorite(song)}>
-                    <HeartIcon size={16} />
+                  <button
+                    type="button"
+                    className={`table-action ${favoriteActive ? 'active' : ''}`}
+                    aria-label={favoriteActive ? '取消收藏' : '收藏歌曲'}
+                    title={favoriteActive ? '取消收藏' : '收藏歌曲'}
+                    aria-pressed={favoriteActive}
+                    onClick={() => onFavorite(song)}
+                  >
+                    {favoriteActive ? <HeartFillIcon size={16} /> : <HeartIcon size={16} />}
                   </button>
                 )}
                 <button type="button" className="table-action" aria-label="立即播放" onClick={() => onPlay(song)}>
@@ -132,6 +154,11 @@ export default function SongTable({
                 {onMore && (
                   <button type="button" className="table-action" aria-label="更多操作" onClick={() => onMore(song)}>
                     <MoreIcon size={16} />
+                  </button>
+                )}
+                {onDelete && (
+                  <button type="button" className="table-action table-action-danger" aria-label={deleteLabel} title={deleteLabel} onClick={() => onDelete(song)}>
+                    <TrashIcon size={16} />
                   </button>
                 )}
               </span>

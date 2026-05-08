@@ -6,6 +6,7 @@ import { getImgReferrerPolicy, getTopListDetail, getTopLists } from '../../../co
 import type { Song, TopList } from '../../../core/types';
 import { getMusicSourceLabel } from '../../../core/utils/musicSource';
 import SongTable from '../../components/SongTable';
+import { useToast } from '../../components/ToastHost';
 import VirtualRail from '../../components/VirtualRail';
 import type { DesktopView } from '../../types';
 
@@ -21,13 +22,17 @@ export default function DesktopHome({ onViewChange }: DesktopHomeProps) {
   const [activeSource, setActiveSource] = useState('netease');
   const [topLists, setTopLists] = useState<TopList[]>([]);
   const [featuredSongs, setFeaturedSongs] = useState<Song[]>([]);
+  const [selectedTopListId, setSelectedTopListId] = useState<string | null>(null);
+  const [selectedTopListName, setSelectedTopListName] = useState('');
   const [loadingLists, setLoadingLists] = useState(true);
   const [loadingSongs, setLoadingSongs] = useState(false);
   const [error, setError] = useState('');
   const requestIdRef = useRef(0);
+  const detailRequestIdRef = useRef(0);
   const { playSong } = usePlayerActions();
   const { currentSong, isPlaying } = usePlayerNowPlaying();
-  const { favorites, playlists, toggleFavorite } = useLibrary();
+  const { favorites, playlists, toggleFavorite, isFavorite } = useLibrary();
+  const { showToast } = useToast();
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -39,7 +44,10 @@ export default function DesktopHome({ onViewChange }: DesktopHomeProps) {
   }, []);
 
   const loadTopListDetail = useCallback(async (list: TopList, source = activeSource) => {
+    const requestId = ++detailRequestIdRef.current;
     const key = `${source}:${list.id}`;
+    setSelectedTopListId(key);
+    setSelectedTopListName(list.name);
     const cached = detailCache.get(key);
     if (cached && Date.now() - cached.ts < cacheTtl) {
       setFeaturedSongs(cached.songs);
@@ -48,12 +56,14 @@ export default function DesktopHome({ onViewChange }: DesktopHomeProps) {
     setLoadingSongs(true);
     try {
       const songs = await getTopListDetail(list.id, source);
+      if (requestId !== detailRequestIdRef.current) return;
       detailCache.set(key, { songs, ts: Date.now() });
       setFeaturedSongs(songs);
     } catch {
+      if (requestId !== detailRequestIdRef.current) return;
       setFeaturedSongs([]);
     } finally {
-      setLoadingSongs(false);
+      if (requestId === detailRequestIdRef.current) setLoadingSongs(false);
     }
   }, [activeSource]);
 
@@ -61,6 +71,8 @@ export default function DesktopHome({ onViewChange }: DesktopHomeProps) {
     const requestId = ++requestIdRef.current;
     const load = async () => {
       setError('');
+      setSelectedTopListId(null);
+      setSelectedTopListName('');
       setLoadingLists(true);
       const cached = topListCache.get(activeSource);
       if (cached && Date.now() - cached.ts < cacheTtl) {
@@ -91,6 +103,15 @@ export default function DesktopHome({ onViewChange }: DesktopHomeProps) {
 
   const firstSong = featuredSongs[0];
 
+  const handleFavorite = (song: Song) => {
+    const wasFavorite = isFavorite(song.id, song.source);
+    toggleFavorite(song);
+    showToast(wasFavorite ? '已取消收藏' : '已收藏歌曲', 'success', {
+      label: '撤销',
+      onClick: () => toggleFavorite(song),
+    });
+  };
+
   return (
     <div>
       <section className="hero-grid">
@@ -102,8 +123,14 @@ export default function DesktopHome({ onViewChange }: DesktopHomeProps) {
             <strong>{getMusicSourceLabel(activeSource)}</strong>
           </div>
           <div className="hero-actions">
-            <button type="button" className="primary-button" onClick={() => firstSong && playSong(firstSong)} disabled={!firstSong}>
-              <PlayIcon size={15} /> 播放榜单
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => firstSong && playSong(firstSong)}
+              disabled={!firstSong}
+              title={firstSong ? `播放 ${selectedTopListName || '当前榜单'}` : '先选择榜单'}
+            >
+              <PlayIcon size={15} /> {firstSong ? '播放榜单' : '先选择榜单'}
             </button>
             <button type="button" className="soft-button" onClick={() => onViewChange('search')}>搜索音乐</button>
           </div>
@@ -148,7 +175,13 @@ export default function DesktopHome({ onViewChange }: DesktopHomeProps) {
           renderItem={(list, _index, style) => {
             const cover = list.coverImgUrl || list.picUrl;
             return (
-              <button type="button" className="toplist-card" style={style} onClick={() => loadTopListDetail(list)}>
+              <button
+                type="button"
+                className={`toplist-card ${selectedTopListId === `${activeSource}:${list.id}` ? 'active' : ''}`}
+                style={style}
+                aria-pressed={selectedTopListId === `${activeSource}:${list.id}`}
+                onClick={() => loadTopListDetail(list)}
+              >
                 <div className="cover-tile">
                   {cover ? <img src={cover} alt={list.name} referrerPolicy={getImgReferrerPolicy(cover)} loading="lazy" /> : <MusicIcon size={28} />}
                 </div>
@@ -161,16 +194,16 @@ export default function DesktopHome({ onViewChange }: DesktopHomeProps) {
       )}
 
       <div className="section-header">
-        <h2 className="section-title">榜单热歌</h2>
+        <h2 className="section-title">{selectedTopListName ? `${selectedTopListName} · 热歌` : '榜单热歌'}</h2>
         <span className="source-badge">{getMusicSourceLabel(activeSource)}</span>
       </div>
 
       {loadingSongs && featuredSongs.length === 0 ? (
-        <SongTable songs={[]} currentSong={currentSong} isPlaying={isPlaying} isLoading skeletonRows={7} emptyText="暂无榜单歌曲" onPlay={playSong} onFavorite={toggleFavorite} />
+        <SongTable songs={[]} currentSong={currentSong} isPlaying={isPlaying} isLoading skeletonRows={7} emptyText="暂无榜单歌曲" onPlay={playSong} onFavorite={handleFavorite} isFavorite={(song) => isFavorite(song.id, song.source)} />
       ) : featuredSongs.length === 0 ? (
         <div className="empty-state"><p>选择上方任意榜单后，这里会加载完整热歌列表。</p></div>
       ) : (
-        <SongTable songs={featuredSongs} currentSong={currentSong} isPlaying={isPlaying} emptyText="暂无榜单歌曲" onPlay={playSong} onFavorite={toggleFavorite} />
+        <SongTable songs={featuredSongs} currentSong={currentSong} isPlaying={isPlaying} emptyText="暂无榜单歌曲" onPlay={playSong} onFavorite={handleFavorite} isFavorite={(song) => isFavorite(song.id, song.source)} />
       )}
     </div>
   );

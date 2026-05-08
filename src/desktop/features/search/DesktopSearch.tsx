@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MusicIcon, SearchIcon, TrashIcon } from '../../../core/components/Icons';
 import { useLibrary } from '../../../core/contexts/LibraryContext';
 import { usePlayerActions, usePlayerNowPlaying } from '../../../core/contexts/PlayerContext';
@@ -11,6 +11,7 @@ import {
   getMusicSourceLabel,
 } from '../../../core/utils/musicSource';
 import SongTable from '../../components/SongTable';
+import { useToast } from '../../components/ToastHost';
 
 const historyKey = 'tunefree_search_history';
 const extendedKey = 'tunefree_aggregate_extended_sources';
@@ -44,9 +45,12 @@ export default function DesktopSearch({ commandQuery = '', commandNonce = 0 }: D
   const [hasMore, setHasMore] = useState(true);
   const [searchError, setSearchError] = useState('');
   const [history, setHistory] = useState<string[]>(loadHistory);
+  const debounceRef = useRef<number | null>(null);
+  const searchRequestIdRef = useRef(0);
   const { playSong } = usePlayerActions();
   const { currentSong, isPlaying } = usePlayerNowPlaying();
-  const { toggleFavorite } = useLibrary();
+  const { toggleFavorite, isFavorite } = useLibrary();
+  const { showToast } = useToast();
 
   useEffect(() => {
     localStorage.setItem(historyKey, JSON.stringify(history));
@@ -84,7 +88,11 @@ export default function DesktopSearch({ commandQuery = '', commandNonce = 0 }: D
 
   const performSearch = useCallback(async () => {
     const clean = query.trim();
-    if (!clean) return;
+    if (!clean) {
+      showToast('请输入关键词后再搜索', 'warning');
+      return;
+    }
+    const requestId = ++searchRequestIdRef.current;
     setIsSearching(true);
     setSearchError('');
     addToHistory(clean);
@@ -92,9 +100,11 @@ export default function DesktopSearch({ commandQuery = '', commandNonce = 0 }: D
       const data = searchMode === 'aggregate'
         ? await searchAggregate(clean, page, { includeExtendedSources })
         : await searchSongs(clean, selectedSource, page);
+      if (requestId !== searchRequestIdRef.current) return;
       setResults((prev) => (page === 1 ? data : [...prev, ...data]));
       setHasMore(data.length > 0);
     } catch {
+      if (requestId !== searchRequestIdRef.current) return;
       setSearchError(
         searchMode === 'single' && isGDStudioOnlySource(selectedSource)
           ? `${getMusicSourceLabel(selectedSource, 'full')} 当前不可用，或可能触发了公开接口频控（${GD_STUDIO_RATE_LIMIT_HINT}）。`
@@ -103,16 +113,23 @@ export default function DesktopSearch({ commandQuery = '', commandNonce = 0 }: D
       if (page === 1) setResults([]);
       setHasMore(false);
     } finally {
-      setIsSearching(false);
+      if (requestId === searchRequestIdRef.current) setIsSearching(false);
     }
-  }, [addToHistory, includeExtendedSources, page, query, searchMode, selectedSource]);
+  }, [addToHistory, includeExtendedSources, page, query, searchMode, selectedSource, showToast]);
 
   useEffect(() => {
     if (!query.trim()) return;
-    const timer = window.setTimeout(() => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => {
+      debounceRef.current = null;
       performSearch();
     }, 520);
-    return () => window.clearTimeout(timer);
+    return () => {
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
   }, [performSearch, query, page, searchMode, selectedSource, includeExtendedSources]);
 
   const hint = useMemo(() => {
@@ -129,6 +146,15 @@ export default function DesktopSearch({ commandQuery = '', commandNonce = 0 }: D
   const handlePlay = (song: Song) => {
     addToHistory(query);
     playSong(song);
+  };
+
+  const handleFavorite = (song: Song) => {
+    const wasFavorite = isFavorite(song.id, song.source);
+    toggleFavorite(song);
+    showToast(wasFavorite ? '已取消收藏' : '已收藏歌曲', 'success', {
+      label: '撤销',
+      onClick: () => toggleFavorite(song),
+    });
   };
 
   return (
@@ -150,10 +176,18 @@ export default function DesktopSearch({ commandQuery = '', commandNonce = 0 }: D
             <SearchIcon size={20} />
             <input
               className="search-input-xl"
+              aria-label="搜索关键词"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') performSearch();
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  if (debounceRef.current) {
+                    window.clearTimeout(debounceRef.current);
+                    debounceRef.current = null;
+                  }
+                  performSearch();
+                }
               }}
               placeholder={searchMode === 'aggregate' ? '输入歌名、歌手或歌词片段…' : `搜索 ${getMusicSourceLabel(selectedSource, 'full')}…`}
             />
@@ -210,7 +244,8 @@ export default function DesktopSearch({ commandQuery = '', commandNonce = 0 }: D
               skeletonRows={8}
               emptyText="未找到相关歌曲"
               onPlay={handlePlay}
-              onFavorite={toggleFavorite}
+              onFavorite={handleFavorite}
+              isFavorite={(song) => isFavorite(song.id, song.source)}
             />
           )}
 
@@ -224,7 +259,20 @@ export default function DesktopSearch({ commandQuery = '', commandNonce = 0 }: D
         <aside className="content-card glass-panel">
           <div className="panel-label-row">
             <h3>搜索历史</h3>
-            <button type="button" className="icon-button" aria-label="清空历史" onClick={() => setHistory([])}>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="清空历史"
+              onClick={() => {
+                if (history.length === 0) return;
+                const previousHistory = history;
+                setHistory([]);
+                showToast('已清空搜索历史', 'success', {
+                  label: '撤销',
+                  onClick: () => setHistory(previousHistory),
+                });
+              }}
+            >
               <TrashIcon size={16} />
             </button>
           </div>

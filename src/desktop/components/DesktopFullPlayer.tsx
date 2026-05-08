@@ -33,6 +33,7 @@ import type { AudioQuality } from '../../core/types';
 import { findActiveLyricIndex, hasTranslatedLyrics, parseLyrics, supportsTranslatedLyricFallback, type ParsedLyric } from '../../core/utils/lyrics';
 import { getSongKey, isSameSong } from '../../core/types';
 import CoverArt from './CoverArt';
+import { useToast } from './ToastHost';
 import VirtualList from './VirtualList';
 
 interface DesktopFullPlayerProps {
@@ -108,6 +109,7 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
   const { queue, playMode } = usePlayerQueueState();
   const { audioQuality } = usePlayerSettings();
   const { toggleFavorite, isFavorite, playlists, addToPlaylist, createPlaylist } = useLibrary();
+  const { showToast } = useToast();
   const [downloadQuality, setDownloadQuality] = useState<AudioQuality | null>(null);
   const [lyricsOverride, setLyricsOverride] = useState('');
   const [lyricsLoading, setLyricsLoading] = useState(false);
@@ -117,6 +119,7 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
   const lyricScrollKeyRef = useRef('');
   const {
     playSong,
+    playQueue,
     clearQueue,
     removeFromQueue,
     togglePlay,
@@ -141,6 +144,15 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
   const favoriteActive = hasSong && isFavorite(currentSong.id, currentSong.source);
   const currentSongKey = currentSong ? getSongKey(currentSong) : '';
   const canCreatePlaylist = newPlaylistName.trim().length > 0;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (!isOpen || !currentSong) {
@@ -224,13 +236,29 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
     setDownloadQuality(quality);
     try {
       const url = await getSongUrl(currentSong.id, currentSong.source, quality);
-      if (!url) return;
+      if (!url) {
+        showToast('无法获取下载地址', 'error');
+        return;
+      }
 
       const meta = downloadMeta[quality] || { label: quality.toUpperCase(), ext: 'mp3' };
       triggerDownload(url, `${currentSong.artist} - ${currentSong.name}.${meta.ext}`);
+      showToast('已开始下载', 'success');
+    } catch {
+      showToast('下载失败，请稍后再试', 'error');
     } finally {
       setDownloadQuality(null);
     }
+  };
+
+  const handleToggleFavorite = () => {
+    if (!currentSong) return;
+    const wasFavorite = isFavorite(currentSong.id, currentSong.source);
+    toggleFavorite(currentSong);
+    showToast(wasFavorite ? '已取消收藏' : '已收藏歌曲', 'success', {
+      label: '撤销',
+      onClick: () => currentSong && toggleFavorite(currentSong),
+    });
   };
 
   const handleShare = async () => {
@@ -240,26 +268,56 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
     try {
       if (navigator.share) {
         await navigator.share({ title: currentSong.name, text, url: window.location.origin });
+        showToast('已打开系统分享', 'success');
       } else {
         await navigator.clipboard.writeText(`${text} ${window.location.origin}`);
+        showToast('已复制分享文案', 'success');
       }
-    } catch {
-      // share cancelled
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') showToast('分享失败，请稍后再试', 'error');
     }
   };
 
   const handleCreatePlaylist = () => {
     if (!currentSong || !canCreatePlaylist) return;
     createPlaylist(newPlaylistName.trim(), [currentSong]);
+    showToast(`已创建「${newPlaylistName.trim()}」`, 'success');
     setNewPlaylistName('');
   };
 
+  const handleClearQueue = () => {
+    const previousQueue = queue;
+    if (previousQueue.length <= (currentSong ? 1 : 0)) {
+      showToast('没有待播歌曲需要清空', 'info');
+      return;
+    }
+    clearQueue();
+    showToast('已清空待播队列', 'success', {
+      label: '撤销',
+      onClick: () => void playQueue(previousQueue, currentSong || previousQueue[0]),
+    });
+  };
+
+  const handleRemoveFromQueue = (songId: string | number, source?: string) => {
+    const previousQueue = queue;
+    const previousSong = currentSong;
+    removeFromQueue(songId, source);
+    showToast('已从队列移除', 'success', {
+      label: '撤销',
+      onClick: () => void playQueue(previousQueue, previousSong || previousQueue[0]),
+    });
+  };
+
+  if (!isOpen) return null;
+
   return (
-    <div className={`full-player-layer ${isOpen ? 'open' : ''}`} aria-hidden={!isOpen}>
+    <div className="full-player-layer open">
       <div className="full-player-backdrop" onClick={onClose} />
       <section
         className={`full-player-panel ${currentSong?.pic ? 'has-cover-bg' : ''} ${isPlaying ? 'is-playing' : ''}`}
         style={panelStyle}
+        role="dialog"
+        aria-modal="true"
         aria-label="全屏播放器"
       >
         <button type="button" className="full-close-button" aria-label="收起播放器" onClick={onClose}>
@@ -281,7 +339,7 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
                 type="button"
                 className={`full-action-button ${favoriteActive ? 'active' : ''}`}
                 disabled={!currentSong}
-                onClick={() => currentSong && toggleFavorite(currentSong)}
+                onClick={handleToggleFavorite}
               >
                 {favoriteActive ? <HeartFillIcon size={18} /> : <HeartIcon size={18} />}
                 {favoriteActive ? '已喜欢' : '喜欢'}
@@ -422,7 +480,7 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
               <h3 className="panel-title"><QueueIcon size={18} /> 播放队列</h3>
               <button type="button" className="queue-mode-chip" onClick={togglePlayMode}>{playModeLabel[playMode]}</button>
             </div>
-            <button type="button" className="icon-button" aria-label="清空队列" onClick={clearQueue}>
+            <button type="button" className="icon-button" aria-label="清空待播队列" title="清空待播队列" onClick={handleClearQueue}>
               <TrashIcon size={16} />
             </button>
           </div>
@@ -454,7 +512,7 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
                         type="button"
                         className="table-action"
                         aria-label="从队列移除"
-                        onClick={() => removeFromQueue(song.id, song.source)}
+                        onClick={() => handleRemoveFromQueue(song.id, song.source)}
                       >
                         <TrashIcon size={14} />
                       </button>
@@ -514,7 +572,7 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
               className={`icon-button transport-like-button ${favoriteActive ? 'active' : ''}`}
               aria-label={favoriteActive ? '取消喜欢' : '喜欢当前歌曲'}
               disabled={!currentSong}
-              onClick={() => currentSong && toggleFavorite(currentSong)}
+              onClick={handleToggleFavorite}
             >
               {favoriteActive ? <HeartFillIcon size={16} /> : <HeartIcon size={16} />}
             </button>
@@ -526,6 +584,7 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
                 key={quality}
                 type="button"
                 className={`quality-button ${audioQuality === quality ? 'active' : ''}`}
+                aria-pressed={audioQuality === quality}
                 onClick={() => setAudioQuality(quality)}
               >
                 {quality === 'flac24bit' ? 'Hi-Res' : quality.toUpperCase()}

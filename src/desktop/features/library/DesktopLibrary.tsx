@@ -18,12 +18,13 @@ import {
   UploadIcon,
   WaveformIcon,
 } from '../../../core/components/Icons';
-import { useLibrary } from '../../../core/contexts/LibraryContext';
+import { useLibrary, type LibraryImportMode, type LibraryImportPreview } from '../../../core/contexts/LibraryContext';
 import { usePlayerActions, usePlayerNowPlaying } from '../../../core/contexts/PlayerContext';
 import type { Playlist } from '../../../core/types';
 import type { LibraryView } from '../../types';
 import { GD_STUDIO_ATTRIBUTION, GD_STUDIO_RATE_LIMIT_HINT } from '../../../core/utils/musicSource';
 import SongTable from '../../components/SongTable';
+import { useToast } from '../../components/ToastHost';
 
 const viewMeta: Record<LibraryView, { eyebrow: string; title: string }> = {
   favorites: { eyebrow: 'Your Collection', title: '收藏' },
@@ -53,19 +54,24 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
     playlists,
     corsProxy,
     setCorsProxy,
+    toggleFavorite,
+    isFavorite,
     createPlaylist,
     deletePlaylist,
     renamePlaylist,
     removeFromPlaylist,
     exportData,
-    importData,
+    parseImportData,
+    applyImportData,
+    restoreData,
   } = useLibrary();
-  const { playSong } = usePlayerActions();
+  const { playSong, playQueue } = usePlayerActions();
   const { currentSong, isPlaying } = usePlayerNowPlaying();
+  const { showToast } = useToast();
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [tempProxy, setTempProxy] = useState(corsProxy);
-  const [message, setMessage] = useState('');
+  const [pendingImport, setPendingImport] = useState<LibraryImportPreview | null>(null);
 
   const selectedPlaylist = useMemo(
     () => playlists.find((playlist) => playlist.id === selectedPlaylistId) || null,
@@ -77,9 +83,8 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
     setSelectedPlaylistId(null);
   }, [activeView]);
 
-  const showMessage = (text: string) => {
-    setMessage(text);
-    window.setTimeout(() => setMessage(''), 2200);
+  const showMessage = (text: string, tone: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+    showToast(text, tone);
   };
 
   const handleCreatePlaylist = () => {
@@ -87,17 +92,63 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
     if (!name) return;
     createPlaylist(name);
     setNewPlaylistName('');
-    showMessage(`已创建「${name}」`);
+    showMessage(`已创建「${name}」`, 'success');
+  };
+
+  const handleExport = () => {
+    const result = exportData();
+    showMessage(result.ok ? `已导出 ${result.filename}` : result.error, result.ok ? 'success' : 'error');
   };
 
   const handleFileImport = (file?: File) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
-      const success = event.target?.result ? importData(event.target.result as string) : false;
-      showMessage(success ? '数据导入成功' : '数据导入失败');
+      const result = event.target?.result ? parseImportData(event.target.result as string) : { ok: false as const, error: '文件读取失败' };
+      if (!result.ok) {
+        setPendingImport(null);
+        showMessage(result.error, 'error');
+        return;
+      }
+      setPendingImport(result.data);
+      showMessage('已读取导入文件，请先确认预览', 'info');
     };
+    reader.onerror = () => showMessage('文件读取失败', 'error');
     reader.readAsText(file);
+  };
+
+  const handleFavorite = (song: Playlist['songs'][number]) => {
+    const wasFavorite = isFavorite(song.id, song.source);
+    toggleFavorite(song);
+    showToast(wasFavorite ? '已取消收藏' : '已收藏歌曲', 'success', {
+      label: '撤销',
+      onClick: () => toggleFavorite(song),
+    });
+  };
+
+  const applyPendingImport = (mode: LibraryImportMode) => {
+    if (!pendingImport) return;
+    const confirmed = window.confirm(
+      mode === 'replace'
+        ? '覆盖导入会替换当前收藏和歌单，是否继续？'
+        : '合并导入会把文件内容加入当前资料库，是否继续？',
+    );
+    if (!confirmed) return;
+
+    const result = applyImportData(pendingImport, mode);
+    if (!result.ok) {
+      showMessage(result.error, 'error');
+      return;
+    }
+
+    setPendingImport(null);
+    showToast(mode === 'replace' ? '数据已覆盖导入' : '数据已合并导入', 'success', {
+      label: '撤销',
+      onClick: () => {
+        restoreData(result.backup);
+        showToast('已撤销导入', 'success');
+      },
+    });
   };
 
   const renderPlaylistSongs = (playlist: Playlist) => (
@@ -142,8 +193,11 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
         isPlaying={isPlaying}
         emptyText="这个歌单还没有歌曲"
         actionLabel="操作"
-        onPlay={playSong}
-        onMore={(song) => removeFromPlaylist(playlist.id, song.id, song.source)}
+        onPlay={(song) => void playQueue(playlist.songs, song)}
+        onFavorite={handleFavorite}
+        isFavorite={(song) => isFavorite(song.id, song.source)}
+        onDelete={(song) => removeFromPlaylist(playlist.id, song.id, song.source)}
+        deleteLabel="从歌单移除"
       />
     </div>
   );
@@ -155,12 +209,19 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
           <p className="eyebrow">{meta.eyebrow}</p>
           <h1 className="page-title">{meta.title}</h1>
         </div>
-        {message && <span className="source-badge">{message}</span>}
       </div>
 
       {activeView === 'favorites' && (
         <section>
-          <SongTable songs={favorites} currentSong={currentSong} isPlaying={isPlaying} emptyText="暂无收藏歌曲" onPlay={playSong} />
+          <SongTable
+            songs={favorites}
+            currentSong={currentSong}
+            isPlaying={isPlaying}
+            emptyText="暂无收藏歌曲"
+            onPlay={playSong}
+            onFavorite={handleFavorite}
+            isFavorite={(song) => isFavorite(song.id, song.source)}
+          />
         </section>
       )}
 
@@ -208,7 +269,7 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
             <div className="settings-save-row">
               <button type="button" className="primary-button" onClick={() => {
                 setCorsProxy(tempProxy);
-                showMessage('设置已保存');
+                showMessage('设置已保存', 'success');
               }}>
                 保存配置
               </button>
@@ -221,13 +282,33 @@ export default function DesktopLibrary({ activeView }: DesktopLibraryProps) {
             <p>收藏与本地歌单都保存在浏览器本地；导出的 JSON 会包含版本号、导出时间、收藏列表和歌单列表。</p>
             <div className="backup-detail-list">
               <span>同一 localStorage key 可在桌面端与移动 PWA 间迁移</span>
-              <span>导入 JSON 后会覆盖并恢复收藏与歌单数据</span>
+              <span>导入前会先校验 JSON 并展示预览，不会静默覆盖现有数据</span>
             </div>
+            {pendingImport && (
+              <div className="import-preview-card">
+                <strong>导入预览</strong>
+                <p>当前：{favorites.length} 首收藏 / {playlists.length} 个歌单</p>
+                <p>文件：{pendingImport.favoriteCount} 首收藏 / {pendingImport.playlistCount} 个歌单 / {pendingImport.playlistSongCount} 首歌单歌曲</p>
+                <div className="panel-actions backup-actions">
+                  <button type="button" className="primary-button" onClick={() => applyPendingImport('replace')}>覆盖导入</button>
+                  <button type="button" className="soft-button" onClick={() => applyPendingImport('merge')}>合并导入</button>
+                  <button type="button" className="soft-button" onClick={() => setPendingImport(null)}>取消</button>
+                </div>
+              </div>
+            )}
             <div className="panel-actions backup-actions">
-              <button type="button" className="soft-button" onClick={exportData}>导出 JSON</button>
+              <button type="button" className="soft-button" onClick={handleExport}>导出 JSON</button>
               <label className="soft-button">
                 导入数据
-                <input type="file" accept=".json" style={{ display: 'none' }} onChange={(event) => handleFileImport(event.target.files?.[0])} />
+                <input
+                  type="file"
+                  accept=".json"
+                  style={{ display: 'none' }}
+                  onChange={(event) => {
+                    handleFileImport(event.target.files?.[0]);
+                    event.currentTarget.value = '';
+                  }}
+                />
               </label>
             </div>
           </div>

@@ -28,6 +28,12 @@ import {
 import { getNextQueueIndex, getPrevQueueIndex } from "./playerQueue";
 import { hasTranslatedLyrics, parseLyrics, supportsTranslatedLyricFallback } from "../utils/lyrics";
 
+export interface PlayerNotice {
+  id: number;
+  tone: "info" | "success" | "warning" | "error";
+  message: string;
+}
+
 interface PlayerContextType {
   currentSong: Song | null;
   isPlaying: boolean;
@@ -39,8 +45,12 @@ interface PlayerContextType {
   queue: Song[];
   analyser: AnalyserNode | null;
   audioQuality: AudioQuality;
+  playerNotice: PlayerNotice | null;
   playSong: (song: Song, forceQuality?: AudioQuality) => Promise<void>;
+  playQueue: (songs: Song[], startSong?: Song) => Promise<void>;
   togglePlay: () => void;
+  pausePlayback: () => void;
+  resumePlayback: () => Promise<void>;
   seek: (time: number) => void;
   playNext: (force?: boolean) => void;
   playPrev: () => void;
@@ -55,7 +65,10 @@ interface PlayerContextType {
 type PlayerActionsType = Pick<
   PlayerContextType,
   | "playSong"
+  | "playQueue"
   | "togglePlay"
+  | "pausePlayback"
+  | "resumePlayback"
   | "seek"
   | "playNext"
   | "playPrev"
@@ -79,6 +92,7 @@ type PlayerSettingsType = Pick<PlayerContextType, "audioQuality">;
 type PlayerAnalyserType = Pick<PlayerContextType, "analyser">;
 
 type PlayerProgressType = Pick<PlayerContextType, "currentTime" | "duration">;
+type PlayerNoticeContextType = Pick<PlayerContextType, "playerNotice">;
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 const PlayerActionsContext =
@@ -93,6 +107,8 @@ const PlayerAnalyserContext =
   createContext<PlayerAnalyserType | undefined>(undefined);
 const PlayerProgressContext =
   createContext<PlayerProgressType | undefined>(undefined);
+const PlayerNoticeContext =
+  createContext<PlayerNoticeContextType | undefined>(undefined);
 
 type ParsedSongData = NonNullable<Awaited<ReturnType<typeof parseSongFull>>>;
 
@@ -116,6 +132,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   const [audioQuality, setAudioQualityState] = useState<AudioQuality>(() =>
     loadStoredAudioQuality(),
   );
+  const [playerNotice, setPlayerNotice] = useState<PlayerNotice | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
 
@@ -143,6 +160,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Track error retry to prevent loops
   const retryCountRef = useRef(0);
+
+  const showPlayerNotice = useCallback(
+    (message: string, tone: PlayerNotice["tone"] = "info") => {
+      setPlayerNotice({ id: Date.now(), tone, message });
+    },
+    [],
+  );
 
   // Persistence Effects
   useEffect(() => {
@@ -272,11 +296,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
           console.warn(
             `Triggering fallback to 128k for ${currentSongRef.current.name}`,
           );
+          showPlayerNotice("当前音质不可播放，已尝试切换到 128K", "warning");
           retryCountRef.current = 1;
           playSongRef.current(currentSongRef.current, "128k");
           return;
         }
         console.error("Critical playback failure.", audio.error);
+        showPlayerNotice("这首歌暂时无法播放，请换源或稍后再试", "error");
         setIsLoading(false);
         setIsPlaying(false);
         retryCountRef.current = 0;
@@ -296,7 +322,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     handlersRef.current = handlers;
     audioRef.current = audio;
     return audio;
-  }, []);
+  }, [showPlayerNotice]);
 
   // --- Audio Element 初始化（不预设 crossOrigin，由 playSong 根据源动态决定） ---
   useEffect(() => {
@@ -516,11 +542,54 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     [getParsedSongCacheKey, preloadAudioUrl, resolveParsedSong],
   );
 
+  const pausePlayback = useCallback(() => {
+    const activeAudio = audioRef.current;
+    const song = currentSongRef.current;
+    if (!activeAudio || !song) return;
+
+    playRequestIdRef.current += 1;
+    activeAudio.pause();
+    setIsPlaying(false);
+    setIsLoading(false);
+    updateMediaSession(song, "paused");
+  }, [updateMediaSession]);
+
+  const resumePlayback = useCallback(async () => {
+    const activeAudio = audioRef.current;
+    const song = currentSongRef.current;
+    if (!song) return;
+
+    if (!activeAudio || !activeAudio.src || activeAudio.src === window.location.href) {
+      await playSongRef.current(song);
+      return;
+    }
+
+    if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+      await audioCtxRef.current.resume().catch(() => {});
+    }
+
+    const requestId = ++playRequestIdRef.current;
+    setIsLoading(true);
+    try {
+      await activeAudio.play();
+      if (requestId !== playRequestIdRef.current) return;
+      setIsPlaying(true);
+      setIsLoading(false);
+      updateMediaSession(song, "playing");
+      preloadNextSong(song);
+    } catch (error: any) {
+      if (requestId !== playRequestIdRef.current) return;
+      console.error("Resume playback failed:", error);
+      showPlayerNotice("播放被浏览器阻止，请再次点击播放", "warning");
+      setIsPlaying(false);
+      setIsLoading(false);
+    }
+  }, [preloadNextSong, showPlayerNotice, updateMediaSession]);
+
   const playSong = useCallback(
     async (song: Song, forceQuality?: AudioQuality) => {
       if (!audioRef.current) return;
 
-      const requestId = ++playRequestIdRef.current;
       const targetQuality = forceQuality || audioQualityRef.current;
       const isCurrentSong = isSameSong(currentSongRef.current, song);
       const isDifferentQuality =
@@ -529,31 +598,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       if (isCurrentSong && !isDifferentQuality && !forceQuality) {
         const activeAudio = audioRef.current;
         if (activeAudio.src && activeAudio.src !== window.location.href) {
-          if (!activeAudio.paused) {
-            activeAudio.pause();
-            setIsPlaying(false);
-            setIsLoading(false);
-            updateMediaSession(currentSongRef.current, "paused");
+          if (activeAudio.paused) {
+            await resumePlayback();
           } else {
-            setIsLoading(true);
-            try {
-              await activeAudio.play();
-              if (requestId !== playRequestIdRef.current) return;
-              setIsPlaying(true);
-              setIsLoading(false);
-              updateMediaSession(currentSongRef.current, "playing");
-              preloadNextSong(song);
-            } catch (error) {
-              if (requestId !== playRequestIdRef.current) return;
-              console.error("Play resume failed:", error);
-              setIsPlaying(false);
-              setIsLoading(false);
-            }
+            setIsPlaying(true);
+            setIsLoading(false);
+            updateMediaSession(currentSongRef.current, "playing");
+            preloadNextSong(song);
           }
           return;
         }
       }
 
+      const requestId = ++playRequestIdRef.current;
       setIsLoading(true);
       if (!forceQuality) retryCountRef.current = 0;
 
@@ -697,11 +754,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
               console.warn(
                 "Play promise rejected with source error, triggering fallback to 128k",
               );
+              showPlayerNotice("当前音质不可播放，已尝试切换到 128K", "warning");
               retryCountRef.current = 1;
               playSongRef.current(song, "128k");
               return;
             }
 
+            showPlayerNotice(
+              error?.name === "NotAllowedError"
+                ? "播放被浏览器阻止，请再次点击播放"
+                : "播放失败，请稍后再试",
+              error?.name === "NotAllowedError" ? "warning" : "error",
+            );
             setIsPlaying(false);
             setIsLoading(false);
           }
@@ -710,6 +774,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
           if (targetQuality !== "128k" && retryCountRef.current === 0) {
             console.warn("Retrying with 128k...");
+            showPlayerNotice("当前音质不可播放，已尝试切换到 128K", "warning");
             retryCountRef.current = 1;
             playSongRef.current(song, "128k");
             return;
@@ -720,6 +785,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
           audioRef.current.load();
           setCurrentTime(0);
           setDuration(0);
+          showPlayerNotice("这首歌暂时无法播放，请换源或稍后再试", "error");
           setIsLoading(false);
           setIsPlaying(false);
         }
@@ -738,54 +804,62 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       initAudioContext,
       preloadNextSong,
       resolveParsedSong,
+      resumePlayback,
+      showPlayerNotice,
       updateMediaSession,
     ],
+  );
+
+  const playQueue = useCallback(
+    async (songs: Song[], startSong?: Song) => {
+      const seen = new Set<string>();
+      const nextQueue = songs.filter((song) => {
+        const key = getSongKey(song);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      if (nextQueue.length === 0) return;
+
+      const targetSong = startSong
+        ? nextQueue.find((song) => isSameSong(song, startSong)) || nextQueue[0]
+        : nextQueue[0];
+      if (!targetSong) return;
+
+      clearPreloadedAudio();
+      queueRef.current = nextQueue;
+      setQueue(nextQueue);
+
+      const activeAudio = audioRef.current;
+      if (
+        isSameSong(currentSongRef.current, targetSong) &&
+        activeAudio?.src &&
+        activeAudio.src !== window.location.href &&
+        !activeAudio.paused
+      ) {
+        preloadNextSong(targetSong);
+        return;
+      }
+
+      await playSongRef.current(targetSong);
+    },
+    [clearPreloadedAudio, preloadNextSong],
   );
 
   // 始终保持 playSongRef 指向最新的 playSong，避免 stale closure
   playSongRef.current = playSong;
 
   const togglePlay = useCallback(() => {
-    if (!audioRef.current || !currentSongRef.current) return;
+    const activeAudio = audioRef.current;
+    if (!activeAudio || !currentSongRef.current) return;
 
-    if (
-      !audioRef.current.src ||
-      audioRef.current.src === window.location.href
-    ) {
-      playSongRef.current(currentSongRef.current);
+    if (activeAudio.src && activeAudio.src !== window.location.href && !activeAudio.paused) {
+      pausePlayback();
       return;
     }
 
-    if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
-      audioCtxRef.current.resume();
-    }
-
-    if (!audioRef.current.paused) {
-      playRequestIdRef.current += 1;
-      audioRef.current.pause();
-      setIsPlaying(false);
-      setIsLoading(false);
-      updateMediaSession(currentSongRef.current, "paused");
-    } else {
-      const requestId = ++playRequestIdRef.current;
-      setIsLoading(true);
-      audioRef.current
-        .play()
-        .then(() => {
-          if (requestId !== playRequestIdRef.current) return;
-          setIsPlaying(true);
-          setIsLoading(false);
-          updateMediaSession(currentSongRef.current, "playing");
-          if (currentSongRef.current) preloadNextSong(currentSongRef.current);
-        })
-        .catch((e) => {
-          if (requestId !== playRequestIdRef.current) return;
-          console.error("Toggle play error", e);
-          setIsPlaying(false);
-          setIsLoading(false);
-        });
-    }
-  }, [preloadNextSong, updateMediaSession]);
+    void resumePlayback();
+  }, [pausePlayback, resumePlayback]);
 
   const seek = useCallback((time: number) => {
     if (audioRef.current) {
@@ -827,6 +901,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const playPrev = useCallback(() => {
+    const activeAudio = audioRef.current;
+    if (activeAudio && activeAudio.currentTime > 3) {
+      activeAudio.currentTime = 0;
+      setCurrentTime(0);
+      updatePositionState();
+      return;
+    }
+
     const q = queueRef.current;
     const c = currentSongRef.current;
     const mode = playModeRef.current;
@@ -837,17 +919,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     if (prevIndex < 0) return;
 
     playSongRef.current(q[prevIndex]);
-  }, []);
+  }, [updatePositionState]);
 
   useEffect(() => {
     playNextRef.current = playNext;
   }, [playNext]);
 
-  // MediaSession action handlers — 所有 deps 现在都是稳定 useCallback，注册一次即可
   useEffect(() => {
     if ("mediaSession" in navigator) {
-      navigator.mediaSession.setActionHandler("play", () => togglePlay());
-      navigator.mediaSession.setActionHandler("pause", () => togglePlay());
+      navigator.mediaSession.setActionHandler("play", () => void resumePlayback());
+      navigator.mediaSession.setActionHandler("pause", () => pausePlayback());
       navigator.mediaSession.setActionHandler("previoustrack", () =>
         playPrev(),
       );
@@ -858,8 +939,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
         if (details.seekTime !== undefined) seek(details.seekTime);
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pausePlayback, playNext, playPrev, resumePlayback, seek]);
 
   useEffect(() => {
     if (currentSong) {
@@ -881,18 +961,53 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const removeFromQueue = useCallback(
     (songId: string | number, source?: string) => {
-      setQueue((prev) =>
-        prev.filter(
-          (s) => !(String(s.id) === String(songId) && (!source || s.source === source)),
-        ),
-      );
+      const matchesTarget = (song: Song) =>
+        String(song.id) === String(songId) && (!source || song.source === source);
+      const previousQueue = queueRef.current;
+      const removedIndex = previousQueue.findIndex(matchesTarget);
+      if (removedIndex < 0) return;
+
+      const nextQueue = previousQueue.filter((song) => !matchesTarget(song));
+      queueRef.current = nextQueue;
+      setQueue(nextQueue);
+      clearPreloadedAudio();
+
+      const current = currentSongRef.current;
+      if (!current || !matchesTarget(current)) return;
+
+      if (nextQueue.length === 0) {
+        playRequestIdRef.current += 1;
+        const activeAudio = audioRef.current;
+        if (activeAudio) {
+          activeAudio.pause();
+          activeAudio.removeAttribute("src");
+          activeAudio.load();
+        }
+        currentSongRef.current = null;
+        setCurrentSong(null);
+        setCurrentTime(0);
+        setDuration(0);
+        setIsPlaying(false);
+        setIsLoading(false);
+        if ("mediaSession" in navigator) {
+          navigator.mediaSession.playbackState = "none";
+          navigator.mediaSession.metadata = null;
+        }
+        return;
+      }
+
+      const nextSong = nextQueue[Math.min(removedIndex, nextQueue.length - 1)] || nextQueue[0];
+      if (nextSong) void playSongRef.current(nextSong);
     },
-    [],
+    [clearPreloadedAudio],
   );
 
   const clearQueue = useCallback(() => {
     clearPreloadedAudio();
-    setQueue([]);
+    const current = currentSongRef.current;
+    const nextQueue = current ? [current] : [];
+    queueRef.current = nextQueue;
+    setQueue(nextQueue);
   }, [clearPreloadedAudio]);
 
   const togglePlayMode = useCallback(() => {
@@ -918,7 +1033,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   const actionsValue = useMemo(
     () => ({
       playSong,
+      playQueue,
       togglePlay,
+      pausePlayback,
+      resumePlayback,
       seek,
       playNext,
       playPrev,
@@ -931,7 +1049,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     }),
     [
       playSong,
+      playQueue,
       togglePlay,
+      pausePlayback,
+      resumePlayback,
       seek,
       playNext,
       playPrev,
@@ -983,6 +1104,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     [currentTime, duration],
   );
 
+  const noticeValue = useMemo(
+    () => ({
+      playerNotice,
+    }),
+    [playerNotice],
+  );
+
   // Context value 用 useMemo 稳定对象引用：
   // 只有 state 值实际变化时才创建新对象，避免因无关渲染导致所有消费者重渲
   const contextValue = useMemo(
@@ -997,6 +1125,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       queue,
       analyser,
       audioQuality,
+      playerNotice,
       ...actionsValue,
     }),
     [
@@ -1010,6 +1139,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       queue,
       analyser,
       audioQuality,
+      playerNotice,
       actionsValue,
     ],
   );
@@ -1021,7 +1151,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
           <PlayerSettingsContext.Provider value={settingsValue}>
             <PlayerAnalyserContext.Provider value={analyserValue}>
               <PlayerProgressContext.Provider value={progressValue}>
-                <PlayerContext.Provider value={contextValue}>{children}</PlayerContext.Provider>
+                <PlayerNoticeContext.Provider value={noticeValue}>
+                  <PlayerContext.Provider value={contextValue}>{children}</PlayerContext.Provider>
+                </PlayerNoticeContext.Provider>
               </PlayerProgressContext.Provider>
             </PlayerAnalyserContext.Provider>
           </PlayerSettingsContext.Provider>
@@ -1043,8 +1175,12 @@ const PLAYER_DEFAULTS: PlayerContextType = {
   queue: [],
   analyser: null,
   audioQuality: "320k",
+  playerNotice: null,
   playSong: async () => {},
+  playQueue: async () => {},
   togglePlay: () => {},
+  pausePlayback: () => {},
+  resumePlayback: async () => {},
   seek: () => {},
   playNext: () => {},
   playPrev: () => {},
@@ -1073,7 +1209,10 @@ export const usePlayerActions = () => {
     );
     return {
       playSong: PLAYER_DEFAULTS.playSong,
+      playQueue: PLAYER_DEFAULTS.playQueue,
       togglePlay: PLAYER_DEFAULTS.togglePlay,
+      pausePlayback: PLAYER_DEFAULTS.pausePlayback,
+      resumePlayback: PLAYER_DEFAULTS.resumePlayback,
       seek: PLAYER_DEFAULTS.seek,
       playNext: PLAYER_DEFAULTS.playNext,
       playPrev: PLAYER_DEFAULTS.playPrev,
@@ -1152,6 +1291,19 @@ export const usePlayerProgress = () => {
     return {
       currentTime: PLAYER_DEFAULTS.currentTime,
       duration: PLAYER_DEFAULTS.duration,
+    };
+  }
+  return context;
+};
+
+export const usePlayerNotice = () => {
+  const context = useContext(PlayerNoticeContext);
+  if (!context) {
+    console.warn(
+      "[usePlayerNotice] Provider 未就绪，返回默认提示状态（HMR 热更新中）",
+    );
+    return {
+      playerNotice: PLAYER_DEFAULTS.playerNotice,
     };
   }
   return context;
