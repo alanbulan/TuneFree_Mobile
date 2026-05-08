@@ -660,6 +660,8 @@ img { display: block; }
 .source-option.active { color: #fff; background: var(--ios-red); box-shadow: 0 10px 20px rgba(250,35,59,.16); }
 .search-mode-row { flex: 0 0 auto; align-self: flex-start; padding: 5px; border-radius: 14px; background: rgba(238,238,239,.72); }
 .search-mode-row .segment-button { min-width: 70px; height: 36px; padding: 0 14px; }
+.history-chip-row { flex-wrap: wrap; align-items: flex-start; }
+.history-chip-row .source-chip { max-width: 100%; }
 .source-chip.active,
 .segment-button.active,
 .quality-button.active { color: #fff; background: var(--ios-red); }

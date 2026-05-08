@@ -276,7 +276,7 @@ export default function DesktopSearch({ commandQuery = '', commandNonce = 0 }: D
               <TrashIcon size={16} />
             </button>
           </div>
-          <div className="segment-row">
+          <div className="segment-row history-chip-row">
             {history.length === 0 ? (
               <p className="muted-text">暂无历史记录</p>
             ) : history.map((term) => (
