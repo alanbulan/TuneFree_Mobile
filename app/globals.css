@@ -735,7 +735,7 @@ img { display: block; }
 .virtual-list { position: relative; overflow: auto; contain: strict; }
 .virtual-spacer { position: relative; width: 100%; }
 .song-virtual-list { border-top: 1px solid var(--line); }
-.queue-virtual-list { width: 100%; }
+.queue-virtual-list { width: 100%; flex: 1 1 auto; min-height: 0; }
 .table-head,
 .song-row { display: grid; grid-template-columns: 44px minmax(180px, 1.2fr) minmax(120px, .7fr) 86px 104px; align-items: center; gap: 12px; }
 .table-head { padding: 10px 14px; color: var(--faint); font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; background: #fbfbfd; }
@@ -1392,7 +1392,7 @@ img { display: block; }
 .full-queue-card { position: relative; z-index: 2; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 18px; border: 1px solid rgba(255,255,255,.96); border-radius: 22px; background: #fff; box-shadow: 0 18px 44px rgba(0,0,0,.07); isolation: isolate; }
 .full-queue-card::before { content: ''; position: absolute; inset: 0; z-index: -1; background: #fff; }
 .queue-list { min-height: 0; overflow: hidden; padding-right: 2px; }
-.full-queue-list { flex: 1 1 auto; margin-top: 12px; }
+.full-queue-list { flex: 1 1 auto; min-height: 0; display: flex; margin-top: 12px; }
 .queue-now-card {
   display: grid;
   grid-template-columns: 74px minmax(0, 1fr);

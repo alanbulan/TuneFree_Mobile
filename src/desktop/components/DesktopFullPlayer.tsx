@@ -492,8 +492,8 @@ export default function DesktopFullPlayer({ isOpen, onClose, onSearch }: Desktop
             ) : (
               <VirtualList
                 items={queue}
-                itemHeight={68}
-                maxHeight={340}
+                itemHeight={60}
+                fillParent
                 className="queue-virtual-list"
                 getKey={(song, index) => `${song.source}-${song.id}-${index}`}
                 renderItem={(song, index, style) => {

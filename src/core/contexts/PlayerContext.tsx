@@ -168,6 +168,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     [],
   );
 
+  const syncAudioQualityState = useCallback((quality: AudioQuality) => {
+    audioQualityRef.current = quality;
+    setAudioQualityState(quality);
+  }, []);
+
   // Persistence Effects
   useEffect(() => {
     persistQueue(queue);
@@ -297,6 +302,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
             `Triggering fallback to 128k for ${currentSongRef.current.name}`,
           );
           showPlayerNotice("当前音质不可播放，已尝试切换到 128K", "warning");
+          syncAudioQualityState("128k");
           retryCountRef.current = 1;
           playSongRef.current(currentSongRef.current, "128k");
           return;
@@ -322,7 +328,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     handlersRef.current = handlers;
     audioRef.current = audio;
     return audio;
-  }, [showPlayerNotice]);
+  }, [showPlayerNotice, syncAudioQualityState]);
 
   // --- Audio Element 初始化（不预设 crossOrigin，由 playSong 根据源动态决定） ---
   useEffect(() => {
@@ -755,6 +761,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
                 "Play promise rejected with source error, triggering fallback to 128k",
               );
               showPlayerNotice("当前音质不可播放，已尝试切换到 128K", "warning");
+              syncAudioQualityState("128k");
               retryCountRef.current = 1;
               playSongRef.current(song, "128k");
               return;
@@ -775,6 +782,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
           if (targetQuality !== "128k" && retryCountRef.current === 0) {
             console.warn("Retrying with 128k...");
             showPlayerNotice("当前音质不可播放，已尝试切换到 128K", "warning");
+            syncAudioQualityState("128k");
             retryCountRef.current = 1;
             playSongRef.current(song, "128k");
             return;
@@ -806,6 +814,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
       resolveParsedSong,
       resumePlayback,
       showPlayerNotice,
+      syncAudioQualityState,
       updateMediaSession,
     ],
   );
@@ -1019,7 +1028,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const setAudioQuality = useCallback((q: AudioQuality) => {
-    setAudioQualityState(q);
+    syncAudioQualityState(q);
     // 使用 ref 避免 stale closure，不依赖 currentSong/isPlaying state
     if (
       currentSongRef.current &&
@@ -1028,7 +1037,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({
     ) {
       playSongRef.current(currentSongRef.current, q);
     }
-  }, []);
+  }, [syncAudioQualityState]);
 
   const actionsValue = useMemo(
     () => ({

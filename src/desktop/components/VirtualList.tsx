@@ -1,10 +1,11 @@
 import type { CSSProperties, ReactNode, UIEvent } from 'react';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 interface VirtualListProps<T> {
   items: T[];
   itemHeight: number;
   maxHeight?: number;
+  fillParent?: boolean;
   overscan?: number;
   className?: string;
   getKey: (item: T, index: number) => string;
@@ -15,13 +16,18 @@ export default function VirtualList<T>({
   items,
   itemHeight,
   maxHeight = 620,
+  fillParent = false,
   overscan = 6,
   className = '',
   getKey,
   renderItem,
 }: VirtualListProps<T>) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
-  const viewportHeight = Math.min(items.length * itemHeight, maxHeight);
+  const [parentHeight, setParentHeight] = useState(0);
+  const contentHeight = items.length * itemHeight;
+  const fallbackHeight = Math.min(contentHeight, maxHeight);
+  const viewportHeight = fillParent && parentHeight > 0 ? Math.min(contentHeight, parentHeight) : fallbackHeight;
   const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
   const endIndex = Math.min(items.length, Math.ceil((scrollTop + viewportHeight) / itemHeight) + overscan);
   const visibleItems = useMemo(
@@ -29,13 +35,31 @@ export default function VirtualList<T>({
     [endIndex, items, startIndex],
   );
 
+  useEffect(() => {
+    if (!fillParent) return;
+    const parent = rootRef.current?.parentElement;
+    if (!parent) return;
+
+    const updateParentHeight = () => setParentHeight(parent.clientHeight);
+    updateParentHeight();
+
+    const observer = new ResizeObserver(updateParentHeight);
+    observer.observe(parent);
+    window.addEventListener('resize', updateParentHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateParentHeight);
+    };
+  }, [fillParent]);
+
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     setScrollTop(event.currentTarget.scrollTop);
   };
 
   return (
-    <div className={`virtual-list ${className}`.trim()} style={{ height: viewportHeight }} onScroll={handleScroll}>
-      <div className="virtual-spacer" style={{ height: items.length * itemHeight }}>
+    <div ref={rootRef} className={`virtual-list ${className}`.trim()} style={{ height: viewportHeight }} onScroll={handleScroll}>
+      <div className="virtual-spacer" style={{ height: contentHeight }}>
         {visibleItems.map(({ item, index }) => (
           <Fragment key={getKey(item, index)}>
             {renderItem(item, index, {
